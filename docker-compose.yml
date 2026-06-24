@@ -42,12 +42,12 @@ services:
 
   game-server:
     build:
-      context: ./server
+      context: /home/claude-monitor/mmorpg/server
       dockerfile: Dockerfile
     platform: linux/arm64
     container_name: aethermoor_server
     restart: unless-stopped
-    env_file: .env
+    env_file: /home/claude-monitor/mmorpg/.env
     depends_on:
       postgres-game:
         condition: service_healthy
