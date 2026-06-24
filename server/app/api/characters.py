@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/characters", tags=["characters"])
 MAX_CHARACTERS = 9
 
 
-@router.post("/", response_model=CharacterResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=CharacterResponse, status_code=status.HTTP_201_CREATED)
 async def create_character(
     body: CharacterCreate,
     player: Player = Depends(get_current_player),
@@ -41,7 +41,7 @@ async def create_character(
     return character
 
 
-@router.get("/", response_model=list[CharacterResponse])
+@router.get("", response_model=list[CharacterResponse])
 async def list_characters(
     player: Player = Depends(get_current_player),
     session: AsyncSession = Depends(get_session),

@@ -55,34 +55,16 @@ services:
         condition: service_healthy
     networks:
       - aethermoor_net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=aethermoor_net"
-      # REST API → porta 8000
-      - "traefik.http.routers.game-api.rule=PathPrefix(`/api`)"
-      - "traefik.http.routers.game-api.entrypoints=web"
-      - "traefik.http.routers.game-api.service=game-api-svc"
-      - "traefik.http.services.game-api-svc.loadbalancer.server.port=8000"
-      # WebSocket → porta 8001
-      - "traefik.http.routers.game-ws.rule=PathPrefix(`/ws`)"
-      - "traefik.http.routers.game-ws.entrypoints=web"
-      - "traefik.http.routers.game-ws.service=game-ws-svc"
-      - "traefik.http.services.game-ws-svc.loadbalancer.server.port=8001"
 
-  traefik-game:
-    image: traefik:v3
-    container_name: aethermoor_traefik
+  nginx-game:
+    image: nginx:alpine
+    container_name: aethermoor_nginx
     restart: unless-stopped
-    command:
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=aethermoor_net"
-      - "--entrypoints.web.address=:80"
-      - "--log.level=INFO"
-      - "--accesslog=true"
     ports:
       - "7080:80"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /home/claude-monitor/mmorpg/server/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - game-server
     networks:
       - aethermoor_net
