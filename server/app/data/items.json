@@ -1,9 +1,23 @@
 [
-  {"id": "jellopy",       "name": "Jellopy",           "type": "material",    "weight": 1,   "sell_price": 3},
-  {"id": "sticky_mucus",  "name": "Muco Grudento",     "type": "material",    "weight": 1,   "sell_price": 10},
-  {"id": "fluff",         "name": "Fluff",             "type": "material",    "weight": 1,   "sell_price": 3},
-  {"id": "chrysalis",     "name": "Crisalida",         "type": "material",    "weight": 1,   "sell_price": 10},
-  {"id": "zeny_pouch_sm", "name": "Bolsinha de Zeny",  "type": "zeny_bag",    "weight": 1,   "zeny_amount": 15},
-  {"id": "red_potion",    "name": "Pocao Vermelha",    "type": "consumable",  "weight": 70,  "buy_price": 50,  "sell_price": 25,  "effect": {"hp_restore": 45}},
-  {"id": "orange_potion", "name": "Pocao Laranja",     "type": "consumable",  "weight": 100, "buy_price": 200, "sell_price": 100, "effect": {"hp_restore": 140}}
+  {"id": "jellopy",       "name": "Jellopy",           "type": "material",  "stackable": true,  "weight": 1,   "sell_price": 3},
+  {"id": "sticky_mucus",  "name": "Muco Grudento",     "type": "material",  "stackable": true,  "weight": 1,   "sell_price": 10},
+  {"id": "fluff",         "name": "Fluff",             "type": "material",  "stackable": true,  "weight": 1,   "sell_price": 3},
+  {"id": "chrysalis",     "name": "Crisalida",         "type": "material",  "stackable": true,  "weight": 1,   "sell_price": 10},
+  {"id": "zeny_pouch_sm", "name": "Bolsinha de Zeny",  "type": "zeny_bag",  "stackable": false, "weight": 1,   "zeny_amount": 15},
+  {"id": "red_potion",    "name": "Pocao Vermelha",    "type": "consumable","stackable": true,  "weight": 70,  "buy_price": 50,  "sell_price": 25,  "effect": {"hp_restore": 45}},
+  {"id": "orange_potion", "name": "Pocao Laranja",     "type": "consumable","stackable": true,  "weight": 100, "buy_price": 200, "sell_price": 100, "effect": {"hp_restore": 140}},
+
+  {"id": "short_sword",   "name": "Espada Curta",      "type": "weapon",    "stackable": false, "weight": 600, "slots": 1, "atk": 15, "buy_price": 200,  "sell_price": 100, "equip_slot": "weapon",  "requirements": {"level": 1}},
+  {"id": "knife",         "name": "Faca",              "type": "weapon",    "stackable": false, "weight": 300, "slots": 2, "atk": 10, "buy_price": 100,  "sell_price": 50,  "equip_slot": "weapon",  "requirements": {"level": 1}},
+  {"id": "wooden_staff",  "name": "Cajado de Madeira", "type": "weapon",    "stackable": false, "weight": 500, "slots": 2, "atk": 8,  "matk": 10, "buy_price": 150, "sell_price": 75,  "equip_slot": "weapon",  "requirements": {"level": 1}},
+  {"id": "short_bow",     "name": "Arco Curto",        "type": "weapon",    "stackable": false, "weight": 500, "slots": 1, "atk": 12, "buy_price": 180,  "sell_price": 90,  "equip_slot": "weapon",  "requirements": {"level": 1}},
+
+  {"id": "cotton_shirt",  "name": "Camisa de Algodao", "type": "armor",     "stackable": false, "weight": 200, "slots": 1, "def": 5,  "buy_price": 150, "sell_price": 75,  "equip_slot": "body",    "requirements": {"level": 1}},
+  {"id": "leather_armor", "name": "Armadura de Couro", "type": "armor",     "stackable": false, "weight": 600, "slots": 1, "def": 10, "buy_price": 400, "sell_price": 200, "equip_slot": "body",    "requirements": {"level": 3}},
+  {"id": "novice_hat",    "name": "Chapeu de Novice",  "type": "armor",     "stackable": false, "weight": 100, "slots": 0, "def": 3,  "buy_price": 100, "sell_price": 50,  "equip_slot": "head",    "requirements": {"level": 1}},
+  {"id": "guard_shield",  "name": "Escudo de Guarda",  "type": "armor",     "stackable": false, "weight": 400, "slots": 1, "def": 4,  "buy_price": 250, "sell_price": 125, "equip_slot": "offhand", "requirements": {"level": 1}},
+  {"id": "novice_shoes",  "name": "Sapatos de Novice", "type": "armor",     "stackable": false, "weight": 150, "slots": 0, "def": 2,  "buy_price": 100, "sell_price": 50,  "equip_slot": "feet",    "requirements": {"level": 1}},
+
+  {"id": "card_poring",   "name": "Card Poring",       "type": "card",      "stackable": false, "weight": 1,   "effect": {"luk": 2},  "equip_slot": null},
+  {"id": "card_fabre",    "name": "Card Fabre",        "type": "card",      "stackable": false, "weight": 1,   "effect": {"flee": 5}, "equip_slot": null}
 ]

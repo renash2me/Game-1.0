@@ -143,6 +143,8 @@ async def dispatch(manager: ConnectionManager, character_id: uuid.UUID, raw: str
             await _handle_move(manager, character_id, payload)
         case "ATTACK":
             await _handle_attack(manager, character_id, payload)
+        case "PICKUP":
+            await _handle_pickup(manager, character_id, payload)
         case "CHAT":
             await _handle_chat(manager, character_id, payload)
         case _:
@@ -325,6 +327,47 @@ async def _handle_mob_death(
                 respawn_mob_later(mob_id, map_id, sp["area"], sp["respawn_seconds"])
             )
             break
+
+
+# ── PICKUP ───────────────────────────────────────────────────────────────────
+
+async def _handle_pickup(manager: ConnectionManager, character_id: uuid.UUID, payload: dict) -> None:
+    drop_id = str(payload.get("drop_id", ""))
+    if not drop_id:
+        return
+
+    from app.redis_client import get_redis
+    from app.database import async_session_factory
+    from app.api.inventory import add_item_to_inventory
+
+    r = get_redis()
+    drop_raw = await r.hgetall(f"drop:{drop_id}")
+    if not drop_raw:
+        return
+
+    map_id = manager.get_map(character_id)
+    if not map_id:
+        return
+
+    item_id = drop_raw.get("item_id", "")
+    quantity = int(drop_raw.get("quantity", "1"))
+
+    # Remove drop do Redis
+    await r.delete(f"drop:{drop_id}")
+    await r.srem(f"map_drops:{map_id}", drop_id)
+
+    # Adiciona ao inventário no banco
+    async with async_session_factory() as session:
+        await add_item_to_inventory(character_id, item_id, quantity, session)
+        await session.commit()
+
+    await broadcast_map(manager, map_id, {
+        "type": "DROP_PICKED",
+        "payload": {"drop_id": drop_id, "picker_id": str(character_id)},
+        "timestamp": _now(),
+    })
+
+    logger.debug("drop_picked", drop_id=drop_id, character_id=str(character_id), item=item_id)
 
 
 # ── CHAT ─────────────────────────────────────────────────────────────────────

@@ -49,3 +49,4 @@ class Character(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     player: Mapped["Player"] = relationship("Player", back_populates="characters")
+    inventory: Mapped[list["InventoryItem"]] = relationship("InventoryItem", back_populates="character")
