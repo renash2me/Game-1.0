@@ -165,12 +165,15 @@ async def _handle_move(manager: ConnectionManager, character_id: uuid.UUID, payl
     r = get_redis()
 
     old_map = manager.get_map(character_id)
-    if old_map and old_map != map_id:
+    map_changed = old_map and old_map != map_id
+    if map_changed:
         await r.srem(f"online_players:{old_map}", str(character_id))
         manager.join_map(character_id, map_id)
         await r.sadd(f"online_players:{map_id}", str(character_id))
         await _cache_char_map(character_id, map_id, r)
         await send_map_state(manager, character_id)
+        asyncio.ensure_future(_update_quests_on_map(character_id, map_id, manager))
+        asyncio.ensure_future(_update_aptitude_on_map(character_id, map_id))
     else:
         manager.join_map(character_id, map_id)
 
@@ -318,6 +321,13 @@ async def _handle_mob_death(
         else:
             await r.hset(f"char_stats:{killer_id}", mapping=updates)
 
+    # Quest progress — kill_mob
+    damage = int(char_raw.get("damage_dealt_session", 0))
+    asyncio.ensure_future(_update_quests_on_kill(killer_id, mob_id, map_id, manager))
+
+    # Aptidão do Novice — atualiza de forma assíncrona para não bloquear
+    asyncio.ensure_future(_update_aptitude_on_kill(killer_id, damage))
+
     # Respawn
     maps = get_maps()
     map_data = maps.get(map_id, {})
@@ -406,6 +416,78 @@ async def _handle_chat(manager: ConnectionManager, character_id: uuid.UUID, payl
                 pass
         case _:
             pass
+
+
+# ── Quest / Aptidão (fire-and-forget) ─────────────────────────────────────────
+
+async def _update_quests_on_kill(
+    character_id: uuid.UUID, mob_id: str, map_id: str, manager: ConnectionManager
+) -> None:
+    from app.database import async_session_factory
+    from app.systems.quest_engine import update_kill_progress
+    try:
+        async with async_session_factory() as session:
+            completed = await update_kill_progress(character_id, mob_id, session)
+            await session.commit()
+        for quest_id in completed:
+            await send_to(manager, character_id, {
+                "type": "QUEST_UPDATE",
+                "payload": {"quest_id": quest_id, "status": "ready_to_deliver"},
+                "timestamp": _now(),
+            })
+    except Exception as e:
+        logger.error("quest_kill_update_error", error=str(e))
+
+
+async def _update_quests_on_map(
+    character_id: uuid.UUID, map_id: str, manager: ConnectionManager
+) -> None:
+    from app.database import async_session_factory
+    from app.systems.quest_engine import update_map_progress
+    try:
+        async with async_session_factory() as session:
+            completed = await update_map_progress(character_id, map_id, session)
+            await session.commit()
+        for quest_id in completed:
+            await send_to(manager, character_id, {
+                "type": "QUEST_UPDATE",
+                "payload": {"quest_id": quest_id, "status": "ready_to_deliver"},
+                "timestamp": _now(),
+            })
+    except Exception as e:
+        logger.error("quest_map_update_error", error=str(e))
+
+
+async def _update_aptitude_on_kill(character_id: uuid.UUID, damage: int) -> None:
+    from app.database import async_session_factory
+    from app.models.character import Character
+    from app.systems.aptitude import record_kill, record_damage_dealt
+    from sqlalchemy import select
+    try:
+        async with async_session_factory() as session:
+            result = await session.execute(select(Character).where(Character.id == character_id))
+            char = result.scalar_one_or_none()
+            if char and char.class_id == "novice":
+                char.aptitude_data = record_damage_dealt(record_kill(char.aptitude_data or {}), damage)
+                await session.commit()
+    except Exception as e:
+        logger.error("aptitude_update_error", error=str(e))
+
+
+async def _update_aptitude_on_map(character_id: uuid.UUID, map_id: str) -> None:
+    from app.database import async_session_factory
+    from app.models.character import Character
+    from app.systems.aptitude import record_map_visit
+    from sqlalchemy import select
+    try:
+        async with async_session_factory() as session:
+            result = await session.execute(select(Character).where(Character.id == character_id))
+            char = result.scalar_one_or_none()
+            if char and char.class_id == "novice":
+                char.aptitude_data = record_map_visit(char.aptitude_data or {}, map_id)
+                await session.commit()
+    except Exception as e:
+        logger.error("aptitude_map_error", error=str(e))
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.auth import router as auth_router
 from app.api.characters import router as characters_router
 from app.api.inventory import router as inventory_router
+from app.api.quests import router as quests_router
 from app.data.loader import load_all
 
 logger = structlog.get_logger()
@@ -50,6 +51,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(characters_router)
 app.include_router(inventory_router)
+app.include_router(quests_router)
 
 
 @app.get("/api/health")

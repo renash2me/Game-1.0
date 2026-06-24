@@ -50,3 +50,4 @@ class Character(Base):
 
     player: Mapped["Player"] = relationship("Player", back_populates="characters")
     inventory: Mapped[list["InventoryItem"]] = relationship("InventoryItem", back_populates="character")
+    quests: Mapped[list["Quest"]] = relationship("Quest", back_populates="character")
