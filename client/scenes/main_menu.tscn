@@ -1,0 +1,71 @@
+[gd_scene load_steps=2 format=3 uid="uid://aethermoor_main_menu"]
+
+[ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_mainmenu"]
+
+[node name="MainMenu" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_mainmenu")
+
+[node name="Center" type="CenterContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="VBox" type="VBoxContainer" parent="Center"]
+custom_minimum_size = Vector2(360, 0)
+
+[node name="Title" type="Label" parent="Center/VBox"]
+text = "Aethermoor"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 32
+
+[node name="Spacer" type="Control" parent="Center/VBox"]
+custom_minimum_size = Vector2(0, 20)
+
+[node name="Tabs" type="TabContainer" parent="Center/VBox"]
+custom_minimum_size = Vector2(360, 220)
+
+[node name="Login" type="VBoxContainer" parent="Center/VBox/Tabs"]
+metadata/_tab_name = "Login"
+
+[node name="Username" type="LineEdit" parent="Center/VBox/Tabs/Login"]
+placeholder_text = "Usuário"
+custom_minimum_size = Vector2(320, 36)
+
+[node name="Password" type="LineEdit" parent="Center/VBox/Tabs/Login"]
+placeholder_text = "Senha"
+secret = true
+custom_minimum_size = Vector2(320, 36)
+
+[node name="Error" type="Label" parent="Center/VBox/Tabs/Login"]
+text = ""
+modulate = Color(1, 0.3, 0.3, 1)
+
+[node name="LoginBtn" type="Button" parent="Center/VBox/Tabs/Login"]
+text = "Entrar"
+
+[node name="Registro" type="VBoxContainer" parent="Center/VBox/Tabs"]
+metadata/_tab_name = "Registro"
+
+[node name="Username" type="LineEdit" parent="Center/VBox/Tabs/Registro"]
+placeholder_text = "Usuário (3-20 chars)"
+custom_minimum_size = Vector2(320, 36)
+
+[node name="Email" type="LineEdit" parent="Center/VBox/Tabs/Registro"]
+placeholder_text = "E-mail"
+custom_minimum_size = Vector2(320, 36)
+
+[node name="Password" type="LineEdit" parent="Center/VBox/Tabs/Registro"]
+placeholder_text = "Senha (min. 6)"
+secret = true
+custom_minimum_size = Vector2(320, 36)
+
+[node name="Error" type="Label" parent="Center/VBox/Tabs/Registro"]
+text = ""
+modulate = Color(1, 0.3, 0.3, 1)
+
+[node name="RegisterBtn" type="Button" parent="Center/VBox/Tabs/Registro"]
+text = "Criar conta"
+
+[connection signal="pressed" from="Center/VBox/Tabs/Login/LoginBtn" to="." method="_on_login_pressed"]
+[connection signal="pressed" from="Center/VBox/Tabs/Registro/RegisterBtn" to="." method="_on_register_pressed"]

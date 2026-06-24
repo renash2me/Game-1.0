@@ -1,0 +1,77 @@
+[gd_scene load_steps=2 format=3 uid="uid://aethermoor_inventory"]
+
+[ext_resource type="Script" path="res://scripts/ui/inventory_ui.gd" id="1_inventory"]
+
+[node name="Inventory" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+visible = false
+script = ExtResource("1_inventory")
+
+[node name="Panel" type="PanelContainer" parent="."]
+anchor_left = 0.55
+anchor_top = 0.05
+anchor_right = 1.0
+anchor_bottom = 0.95
+
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="Panel/VBox"]
+text = "Inventário"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 16
+
+[node name="Scroll" type="ScrollContainer" parent="Panel/VBox"]
+size_flags_vertical = 3
+
+[node name="Grid" type="GridContainer" parent="Panel/VBox/Scroll"]
+columns = 5
+theme_override_constants/h_separation = 4
+theme_override_constants/v_separation = 4
+
+[node name="BtnClose" type="Button" parent="Panel/VBox"]
+text = "Fechar (I)"
+
+[node name="Detail" type="Panel" parent="."]
+anchor_left = 0.3
+anchor_top = 0.2
+anchor_right = 0.55
+anchor_bottom = 0.8
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="Detail"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+
+[node name="Name" type="Label" parent="Detail/VBox"]
+text = "Item"
+theme_override_font_sizes/font_size = 14
+
+[node name="Info" type="Label" parent="Detail/VBox"]
+text = ""
+theme_override_font_sizes/font_size = 11
+autowrap_mode = 3
+
+[node name="BtnEquip" type="Button" parent="Detail/VBox"]
+text = "Equipar"
+visible = false
+
+[node name="BtnUnequip" type="Button" parent="Detail/VBox"]
+text = "Desequipar"
+visible = false
+
+[node name="BtnRefine" type="Button" parent="Detail/VBox"]
+text = "Refinar"
+visible = false
+
+[node name="Error" type="Label" parent="Detail/VBox"]
+text = ""
+modulate = Color(1, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 11
+
+[connection signal="pressed" from="Panel/VBox/BtnClose" to="." method="hide"]

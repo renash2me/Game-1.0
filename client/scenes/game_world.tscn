@@ -1,0 +1,29 @@
+[gd_scene load_steps=6 format=3 uid="uid://aethermoor_game_world"]
+
+[ext_resource type="Script" path="res://scripts/ui/game_world.gd" id="1_gameworld"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="2_hud"]
+[ext_resource type="PackedScene" path="res://scenes/ui/chat.tscn" id="3_chat"]
+[ext_resource type="PackedScene" path="res://scenes/ui/inventory_ui.tscn" id="4_inventory"]
+
+[node name="GameWorld" type="Node2D"]
+script = ExtResource("1_gameworld")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(2, 2)
+enabled = true
+
+[node name="Layers" type="Node2D" parent="."]
+
+[node name="Drops" type="Node2D" parent="Layers"]
+
+[node name="Mobs" type="Node2D" parent="Layers"]
+
+[node name="Players" type="Node2D" parent="Layers"]
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="HudContent" parent="HUD" instance=ExtResource("2_hud")]
+
+[node name="Chat" parent="HUD" instance=ExtResource("3_chat")]
+
+[node name="Inventory" parent="HUD" instance=ExtResource("4_inventory")]
