@@ -1,20 +1,52 @@
 import asyncio
+import uuid
 
 import structlog
 import websockets
 from websockets.server import WebSocketServerProtocol
 
 from app.config import settings
+from app.ws.connection_manager import ConnectionManager
 
 logger = structlog.get_logger()
 
+manager = ConnectionManager()
+
 
 async def handle_connection(websocket: WebSocketServerProtocol) -> None:
-    logger.info("client_connected", remote=str(websocket.remote_address))
+    character_id: uuid.UUID | None = None
     try:
-        await websocket.wait_closed()
+        character_id = await _authenticate(websocket)
+        if character_id is None:
+            return
+
+        await manager.connect(character_id, websocket)
+
+        async for raw in websocket:
+            await _dispatch(character_id, raw)
+
+    except websockets.exceptions.ConnectionClosedOK:
+        pass
+    except websockets.exceptions.ConnectionClosedError as e:
+        logger.warning("ws_connection_error", error=str(e))
     finally:
-        logger.info("client_disconnected", remote=str(websocket.remote_address))
+        if character_id is not None:
+            await manager.disconnect(character_id)
+
+
+async def _authenticate(websocket: WebSocketServerProtocol) -> uuid.UUID | None:
+    from app.ws.handlers import handle_auth
+    try:
+        raw = await asyncio.wait_for(websocket.recv(), timeout=10.0)
+        return await handle_auth(websocket, raw)
+    except asyncio.TimeoutError:
+        await websocket.close(4001, "Auth timeout")
+        return None
+
+
+async def _dispatch(character_id: uuid.UUID, raw: str) -> None:
+    from app.ws.handlers import dispatch
+    await dispatch(manager, character_id, raw)
 
 
 async def start_ws_server() -> None:
