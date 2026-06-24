@@ -12,7 +12,7 @@ from app.schemas.character import CharacterCreate, CharacterResponse
 
 router = APIRouter(prefix="/api/characters", tags=["characters"])
 
-MAX_CHARACTERS = 3
+MAX_CHARACTERS = 9
 
 
 @router.post("/", response_model=CharacterResponse, status_code=status.HTTP_201_CREATED)
