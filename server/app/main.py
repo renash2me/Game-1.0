@@ -4,6 +4,8 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.auth import router as auth_router
+from app.api.characters import router as characters_router
 from app.data.loader import load_all
 
 logger = structlog.get_logger()
@@ -31,6 +33,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router)
+app.include_router(characters_router)
 
 
 @app.get("/api/health")

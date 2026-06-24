@@ -1,11 +1,15 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class Character(Base):
@@ -42,6 +46,6 @@ class Character(Base):
     pos_y: Mapped[float] = mapped_column(Float, default=0.0)
     zeny: Mapped[int] = mapped_column(BigInteger, default=0)
     aptitude_data: Mapped[dict] = mapped_column(JSONB, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     player: Mapped["Player"] = relationship("Player", back_populates="characters")
