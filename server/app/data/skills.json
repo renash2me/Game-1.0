@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "id": "basic_skill",
+    "name": "Habilidade Basica",
+    "class_required": "novice",
+    "max_level": 9,
+    "type": "passive",
+    "sp_cost": 0,
+    "cooldown": 0,
+    "effects": [{"level": 1, "description": "Desbloqueia trade, chat party e chat guild"}]
+  },
+  {
+    "id": "first_aid",
+    "name": "Primeiros Socorros",
+    "class_required": "novice",
+    "max_level": 1,
+    "type": "active",
+    "sp_cost": 3,
+    "cast_time": 0,
+    "cooldown": 5000,
+    "effects": [{"level": 1, "hp_restore": 5}]
+  }
+]

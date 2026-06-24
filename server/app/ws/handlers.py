@@ -11,21 +11,17 @@ from app.ws.connection_manager import ConnectionManager
 
 logger = structlog.get_logger()
 
-# Canais de chat válidos
 CHAT_CHANNELS = {"global", "local", "party", "guild", "whisper"}
 
 
+# ── Auth ─────────────────────────────────────────────────────────────────────
+
 async def handle_auth(websocket: WebSocketServerProtocol, raw: str) -> uuid.UUID | None:
-    """
-    Primeira mensagem obrigatória: AUTH com JWT + character_id.
-    Formato: {"type": "AUTH", "payload": {"token": "...", "character_id": "..."}}
-    """
     from app.core.security import decode_token
     from app.database import async_session_factory
     from app.models.character import Character
-    from app.models.player import Player
-    from sqlalchemy import select
     from jose import JWTError
+    from sqlalchemy import select
 
     try:
         msg = json.loads(raw)
@@ -34,14 +30,10 @@ async def handle_auth(websocket: WebSocketServerProtocol, raw: str) -> uuid.UUID
             return None
 
         payload = msg.get("payload", {})
-        token: str = payload.get("token", "")
-        char_id_str: str = payload.get("character_id", "")
-
-        player_id = uuid.UUID(decode_token(token))
-        character_id = uuid.UUID(char_id_str)
-
+        player_id = uuid.UUID(decode_token(payload["token"]))
+        character_id = uuid.UUID(payload["character_id"])
     except (JWTError, ValueError, KeyError, json.JSONDecodeError):
-        await websocket.close(4003, "Auth inválida")
+        await websocket.close(4003, "Auth invalida")
         return None
 
     async with async_session_factory() as session:
@@ -54,8 +46,11 @@ async def handle_auth(websocket: WebSocketServerProtocol, raw: str) -> uuid.UUID
         character = result.scalar_one_or_none()
 
     if character is None:
-        await websocket.close(4004, "Personagem não encontrado")
+        await websocket.close(4004, "Personagem nao encontrado")
         return None
+
+    # Guarda stats em cache Redis para o loop de IA usar
+    await _cache_char_stats(character)
 
     await websocket.send(json.dumps({
         "type": "AUTH_OK",
@@ -72,6 +67,68 @@ async def handle_auth(websocket: WebSocketServerProtocol, raw: str) -> uuid.UUID
     return character_id
 
 
+async def send_map_state(manager: ConnectionManager, character_id: uuid.UUID) -> None:
+    """Envia MAP_PLAYERS e lista de mobs ao entrar no mapa."""
+    from app.redis_client import get_redis
+    from app.data.loader import get_monsters
+
+    r = get_redis()
+    char_raw = await r.hgetall(f"char_stats:{character_id}")
+    map_id = char_raw.get("current_map", "starter_village")
+
+    manager.join_map(character_id, map_id)
+    await r.sadd(f"online_players:{map_id}", str(character_id))
+
+    # Posição inicial no Redis
+    await r.hset(f"pos:{character_id}", mapping={
+        "map_id": map_id,
+        "x": char_raw.get("pos_x", "0.0"),
+        "y": char_raw.get("pos_y", "0.0"),
+    })
+
+    # MAP_PLAYERS — outros jogadores no mapa
+    members = manager.get_map_members(map_id) - {character_id}
+    players_data = []
+    for cid in members:
+        pos = await r.hgetall(f"pos:{cid}")
+        if pos:
+            players_data.append({"character_id": str(cid), "x": float(pos["x"]), "y": float(pos["y"])})
+
+    await send_to(manager, character_id, {
+        "type": "MAP_PLAYERS",
+        "payload": {"players": players_data},
+        "timestamp": _now(),
+    })
+
+    # MOB_SPAWN — mobs ativos no mapa
+    monsters = get_monsters()
+    instance_ids = await r.smembers(f"map_mobs:{map_id}")
+    mobs_data = []
+    for iid in instance_ids:
+        mob_raw = await r.hgetall(f"mob:{iid}")
+        if not mob_raw:
+            continue
+        mob_data = monsters.get(mob_raw.get("mob_id", ""), {})
+        mobs_data.append({
+            "instance_id": iid,
+            "mob_id": mob_raw.get("mob_id"),
+            "name": mob_data.get("name", "?"),
+            "hp": int(mob_raw.get("hp", 0)),
+            "hp_max": int(mob_raw.get("hp_max", 1)),
+            "x": float(mob_raw.get("x", 0)),
+            "y": float(mob_raw.get("y", 0)),
+        })
+
+    if mobs_data:
+        await send_to(manager, character_id, {
+            "type": "MOB_SPAWN",
+            "payload": {"mobs": mobs_data},
+            "timestamp": _now(),
+        })
+
+
+# ── Dispatch ─────────────────────────────────────────────────────────────────
+
 async def dispatch(manager: ConnectionManager, character_id: uuid.UUID, raw: str) -> None:
     try:
         msg = json.loads(raw)
@@ -84,17 +141,17 @@ async def dispatch(manager: ConnectionManager, character_id: uuid.UUID, raw: str
     match msg_type:
         case "MOVE":
             await _handle_move(manager, character_id, payload)
+        case "ATTACK":
+            await _handle_attack(manager, character_id, payload)
         case "CHAT":
             await _handle_chat(manager, character_id, payload)
         case _:
-            logger.debug("ws_unknown_type", type=msg_type, character_id=str(character_id))
+            logger.debug("ws_unknown_type", type=msg_type)
 
 
-async def _handle_move(
-    manager: ConnectionManager,
-    character_id: uuid.UUID,
-    payload: dict,
-) -> None:
+# ── MOVE ─────────────────────────────────────────────────────────────────────
+
+async def _handle_move(manager: ConnectionManager, character_id: uuid.UUID, payload: dict) -> None:
     try:
         x = float(payload["x"])
         y = float(payload["y"])
@@ -102,35 +159,179 @@ async def _handle_move(
     except (KeyError, ValueError, TypeError):
         return
 
-    # Garante que o personagem está na room correta
-    manager.join_map(character_id, map_id)
+    from app.redis_client import get_redis
+    r = get_redis()
 
-    # Persiste posição no Redis (fire-and-forget, sem await)
-    asyncio.ensure_future(_persist_position(character_id, map_id, x, y))
+    old_map = manager.get_map(character_id)
+    if old_map and old_map != map_id:
+        await r.srem(f"online_players:{old_map}", str(character_id))
+        manager.join_map(character_id, map_id)
+        await r.sadd(f"online_players:{map_id}", str(character_id))
+        await _cache_char_map(character_id, map_id, r)
+        await send_map_state(manager, character_id)
+    else:
+        manager.join_map(character_id, map_id)
 
-    # Broadcast para todos no mapa, exceto quem se moveu
-    await broadcast_map(
-        manager,
-        map_id,
-        {
-            "type": "PLAYER_MOVE",
-            "payload": {
-                "character_id": str(character_id),
-                "x": x,
-                "y": y,
-                "map_id": map_id,
-            },
-            "timestamp": _now(),
+    await r.hset(f"pos:{character_id}", mapping={"map_id": map_id, "x": str(x), "y": str(y)})
+
+    await broadcast_map(manager, map_id, {
+        "type": "PLAYER_MOVE",
+        "payload": {"character_id": str(character_id), "x": x, "y": y, "map_id": map_id},
+        "timestamp": _now(),
+    }, exclude=character_id)
+
+
+# ── ATTACK ────────────────────────────────────────────────────────────────────
+
+async def _handle_attack(manager: ConnectionManager, character_id: uuid.UUID, payload: dict) -> None:
+    from app.redis_client import get_redis
+    from app.systems.combat import physical_attack, stats_from_character, stats_from_mob
+    from app.systems.drop_system import roll_drops
+    from app.systems.mob_spawn import respawn_mob_later, save_drops_to_redis
+    from app.systems.xp_level import check_level_up
+    from app.data.loader import get_monsters
+
+    instance_id = str(payload.get("target_id", ""))
+    if not instance_id:
+        return
+
+    r = get_redis()
+    mob_raw = await r.hgetall(f"mob:{instance_id}")
+    if not mob_raw or mob_raw.get("state") == "dead":
+        return
+
+    map_id = mob_raw.get("map_id", "")
+    if manager.get_map(character_id) != map_id:
+        return
+
+    # Stats do atacante
+    char_raw = await r.hgetall(f"char_stats:{character_id}")
+    if not char_raw:
+        return
+
+    mob_id = mob_raw["mob_id"]
+    mob_data = get_monsters().get(mob_id, {})
+    if not mob_data:
+        return
+
+    # Atualiza aggro: mob agora persegue o atacante
+    await r.hset(f"mob:{instance_id}", mapping={"state": "aggro", "target_id": str(character_id)})
+
+    char_stats = stats_from_character(char_raw)
+    mob_stats = stats_from_mob(mob_data)
+    damage, is_miss, is_crit = physical_attack(char_stats, mob_stats)
+
+    mob_hp = int(mob_raw["hp"])
+    mob_hp_max = int(mob_raw["hp_max"])
+    new_hp = max(0, mob_hp - damage)
+
+    await broadcast_map(manager, map_id, {
+        "type": "DAMAGE",
+        "payload": {
+            "attacker_id": str(character_id),
+            "attacker_type": "player",
+            "target_id": instance_id,
+            "target_type": "mob",
+            "damage": damage,
+            "is_miss": is_miss,
+            "is_critical": is_crit,
+            "target_hp": new_hp,
+            "target_hp_max": mob_hp_max,
         },
-        exclude=character_id,
-    )
+        "timestamp": _now(),
+    })
+
+    if new_hp <= 0:
+        await _handle_mob_death(
+            manager, r, character_id, instance_id, mob_id, mob_data, map_id, char_raw
+        )
+    else:
+        await r.hset(f"mob:{instance_id}", "hp", str(new_hp))
 
 
-async def _handle_chat(
+async def _handle_mob_death(
     manager: ConnectionManager,
-    character_id: uuid.UUID,
-    payload: dict,
+    r,
+    killer_id: uuid.UUID,
+    instance_id: str,
+    mob_id: str,
+    mob_data: dict,
+    map_id: str,
+    char_raw: dict,
 ) -> None:
+    from app.systems.drop_system import roll_drops
+    from app.systems.mob_spawn import respawn_mob_later, save_drops_to_redis
+    from app.systems.xp_level import check_level_up
+    from app.data.loader import get_maps
+
+    # Marca mob como morto e remove do mapa
+    await r.hset(f"mob:{instance_id}", "state", "dead")
+    await r.srem(f"map_mobs:{map_id}", instance_id)
+    await r.delete(f"mob:{instance_id}")
+
+    # Drops
+    mob_x = float(mob_data.get("x", 0))
+    mob_y = float(mob_data.get("y", 0))
+    drops = roll_drops(mob_data)
+    drop_dicts = await save_drops_to_redis(map_id, drops, mob_x, mob_y, mob_id)
+
+    await broadcast_map(manager, map_id, {
+        "type": "MOB_DEATH",
+        "payload": {
+            "instance_id": instance_id,
+            "killer_id": str(killer_id),
+            "drops": drop_dicts,
+        },
+        "timestamp": _now(),
+    })
+
+    # XP
+    base_xp = mob_data.get("base_xp", 0)
+    if base_xp > 0:
+        level = int(char_raw.get("level", 1))
+        xp = int(char_raw.get("xp", 0))
+        xp_to_next = int(char_raw.get("xp_to_next", 10))
+
+        new_xp = xp + base_xp
+        new_level, new_xp, new_xp_to_next, sp, skp = check_level_up(level, new_xp, xp_to_next)
+
+        updates = {"xp": str(new_xp), "xp_to_next": str(new_xp_to_next)}
+        if new_level > level:
+            updates["level"] = str(new_level)
+            updates["stat_points"] = str(int(char_raw.get("stat_points", 0)) + sp)
+            updates["skill_points"] = str(int(char_raw.get("skill_points", 0)) + skp)
+            await r.hset(f"char_stats:{killer_id}", mapping=updates)
+            await _persist_char_to_db(killer_id, updates)
+
+            await send_to(manager, killer_id, {
+                "type": "LEVEL_UP",
+                "payload": {
+                    "character_id": str(killer_id),
+                    "new_level": new_level,
+                    "stat_points_gained": sp,
+                    "skill_points_gained": skp,
+                },
+                "timestamp": _now(),
+            })
+        else:
+            await r.hset(f"char_stats:{killer_id}", mapping=updates)
+
+    # Respawn
+    maps = get_maps()
+    map_data = maps.get(map_id, {})
+    for sp in map_data.get("spawn_points", []):
+        if sp["mob_id"] == mob_id:
+            asyncio.ensure_future(
+                respawn_mob_later(mob_id, map_id, sp["area"], sp["respawn_seconds"])
+            )
+            break
+
+
+# ── CHAT ─────────────────────────────────────────────────────────────────────
+
+async def _handle_chat(manager: ConnectionManager, character_id: uuid.UUID, payload: dict) -> None:
+    from app.ws.broadcaster import broadcast_global
+
     try:
         channel = str(payload["channel"])
         content = str(payload["content"]).strip()
@@ -142,48 +343,79 @@ async def _handle_chat(
 
     message = {
         "type": "CHAT_MESSAGE",
-        "payload": {
-            "character_id": str(character_id),
-            "channel": channel,
-            "content": content,
-        },
+        "payload": {"character_id": str(character_id), "channel": channel, "content": content},
         "timestamp": _now(),
     }
 
     match channel:
         case "global":
-            from app.ws.broadcaster import broadcast_global
             await broadcast_global(manager, message)
         case "local":
             map_id = manager.get_map(character_id)
             if map_id:
                 await broadcast_map(manager, map_id, message)
         case "whisper":
-            target_id_str = payload.get("target_id", "")
             try:
-                target_id = uuid.UUID(target_id_str)
+                target_id = uuid.UUID(payload.get("target_id", ""))
                 await send_to(manager, target_id, message)
                 await send_to(manager, character_id, message)
             except ValueError:
                 pass
         case _:
-            # party e guild: implementados nas etapas de guilds/party
             pass
 
 
-async def _persist_position(
-    character_id: uuid.UUID,
-    map_id: str,
-    x: float,
-    y: float,
-) -> None:
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+async def _cache_char_stats(character) -> None:
     from app.redis_client import get_redis
     r = get_redis()
-    await r.hset(
-        f"pos:{character_id}",
-        mapping={"map_id": map_id, "x": str(x), "y": str(y)},
-    )
-    await r.sadd(f"online_players:{map_id}", str(character_id))
+    await r.hset(f"char_stats:{character.id}", mapping={
+        "level": str(character.level),
+        "xp": str(character.xp),
+        "xp_to_next": str(character.xp_to_next),
+        "str_stat": str(character.str_stat),
+        "agi": str(character.agi),
+        "vit": str(character.vit),
+        "int_stat": str(character.int_stat),
+        "dex": str(character.dex),
+        "luk": str(character.luk),
+        "stat_points": str(character.stat_points),
+        "skill_points": str(character.skill_points),
+        "hp": str(character.hp),
+        "hp_max": str(character.hp_max),
+        "sp": str(character.sp),
+        "sp_max": str(character.sp_max),
+        "current_map": character.current_map,
+        "pos_x": str(character.pos_x),
+        "pos_y": str(character.pos_y),
+    })
+
+
+async def _cache_char_map(character_id: uuid.UUID, map_id: str, r) -> None:
+    await r.hset(f"char_stats:{character_id}", "current_map", map_id)
+
+
+async def _persist_char_to_db(character_id: uuid.UUID, updates: dict) -> None:
+    from app.database import async_session_factory
+    from app.models.character import Character
+    from sqlalchemy import select
+
+    async with async_session_factory() as session:
+        result = await session.execute(select(Character).where(Character.id == character_id))
+        char = result.scalar_one_or_none()
+        if char:
+            if "level" in updates:
+                char.level = int(updates["level"])
+            if "xp" in updates:
+                char.xp = int(updates["xp"])
+            if "xp_to_next" in updates:
+                char.xp_to_next = int(updates["xp_to_next"])
+            if "stat_points" in updates:
+                char.stat_points = int(updates["stat_points"])
+            if "skill_points" in updates:
+                char.skill_points = int(updates["skill_points"])
+            await session.commit()
 
 
 def _now() -> int:

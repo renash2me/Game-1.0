@@ -1,1 +1,72 @@
-[]
+[
+  {
+    "id": "novice",
+    "name": "Novice",
+    "tier": 0,
+    "evolves_from": null,
+    "requirements": {},
+    "hp_per_level": 5,
+    "sp_per_level": 2,
+    "evolutions": ["warrior", "mage", "archer", "acolyte", "merchant", "thief"]
+  },
+  {
+    "id": "warrior",
+    "name": "Warrior",
+    "tier": 1,
+    "evolves_from": "novice",
+    "requirements": {"level": 10},
+    "hp_per_level": 15,
+    "sp_per_level": 3,
+    "evolutions": []
+  },
+  {
+    "id": "mage",
+    "name": "Mage",
+    "tier": 1,
+    "evolves_from": "novice",
+    "requirements": {"level": 10},
+    "hp_per_level": 8,
+    "sp_per_level": 8,
+    "evolutions": []
+  },
+  {
+    "id": "archer",
+    "name": "Archer",
+    "tier": 1,
+    "evolves_from": "novice",
+    "requirements": {"level": 10},
+    "hp_per_level": 10,
+    "sp_per_level": 4,
+    "evolutions": []
+  },
+  {
+    "id": "acolyte",
+    "name": "Acolyte",
+    "tier": 1,
+    "evolves_from": "novice",
+    "requirements": {"level": 10},
+    "hp_per_level": 8,
+    "sp_per_level": 6,
+    "evolutions": []
+  },
+  {
+    "id": "merchant",
+    "name": "Merchant",
+    "tier": 1,
+    "evolves_from": "novice",
+    "requirements": {"level": 10},
+    "hp_per_level": 10,
+    "sp_per_level": 4,
+    "evolutions": []
+  },
+  {
+    "id": "thief",
+    "name": "Thief",
+    "tier": 1,
+    "evolves_from": "novice",
+    "requirements": {"level": 10},
+    "hp_per_level": 10,
+    "sp_per_level": 4,
+    "evolutions": []
+  }
+]

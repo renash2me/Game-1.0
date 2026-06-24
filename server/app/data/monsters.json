@@ -1,1 +1,51 @@
-[]
+[
+  {
+    "id": "poring",
+    "name": "Poring",
+    "level": 1,
+    "hp_max": 50,
+    "base_xp": 2,
+    "job_xp": 1,
+    "str": 1, "agi": 1, "vit": 0, "int_": 0, "dex": 6, "luk": 30,
+    "attack_min": 7,
+    "attack_max": 10,
+    "defense": 0,
+    "move_speed": 55.0,
+    "attack_range": 50.0,
+    "aggro_range": 0.0,
+    "ai_type": "passive",
+    "size": "small",
+    "element": "water",
+    "race": "plant",
+    "drops": [
+      {"item_id": "jellopy",       "chance": 0.7000},
+      {"item_id": "sticky_mucus",  "chance": 0.1500},
+      {"item_id": "zeny_pouch_sm", "chance": 0.3000},
+      {"item_id": "card_poring",   "chance": 0.0001}
+    ]
+  },
+  {
+    "id": "fabre",
+    "name": "Fabre",
+    "level": 2,
+    "hp_max": 80,
+    "base_xp": 4,
+    "job_xp": 2,
+    "str": 3, "agi": 3, "vit": 0, "int_": 0, "dex": 10, "luk": 5,
+    "attack_min": 12,
+    "attack_max": 16,
+    "defense": 0,
+    "move_speed": 80.0,
+    "attack_range": 50.0,
+    "aggro_range": 90.0,
+    "ai_type": "aggressive",
+    "size": "small",
+    "element": "earth",
+    "race": "insect",
+    "drops": [
+      {"item_id": "fluff",      "chance": 0.6000},
+      {"item_id": "chrysalis",  "chance": 0.0500},
+      {"item_id": "card_fabre", "chance": 0.0001}
+    ]
+  }
+]

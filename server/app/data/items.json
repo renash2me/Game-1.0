@@ -1,1 +1,9 @@
-[]
+[
+  {"id": "jellopy",       "name": "Jellopy",           "type": "material",    "weight": 1,   "sell_price": 3},
+  {"id": "sticky_mucus",  "name": "Muco Grudento",     "type": "material",    "weight": 1,   "sell_price": 10},
+  {"id": "fluff",         "name": "Fluff",             "type": "material",    "weight": 1,   "sell_price": 3},
+  {"id": "chrysalis",     "name": "Crisalida",         "type": "material",    "weight": 1,   "sell_price": 10},
+  {"id": "zeny_pouch_sm", "name": "Bolsinha de Zeny",  "type": "zeny_bag",    "weight": 1,   "zeny_amount": 15},
+  {"id": "red_potion",    "name": "Pocao Vermelha",    "type": "consumable",  "weight": 70,  "buy_price": 50,  "sell_price": 25,  "effect": {"hp_restore": 45}},
+  {"id": "orange_potion", "name": "Pocao Laranja",     "type": "consumable",  "weight": 100, "buy_price": 200, "sell_price": 100, "effect": {"hp_restore": 140}}
+]

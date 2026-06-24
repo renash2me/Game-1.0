@@ -6,11 +6,9 @@ import websockets
 from websockets.server import WebSocketServerProtocol
 
 from app.config import settings
-from app.ws.connection_manager import ConnectionManager
+from app.ws.manager import manager
 
 logger = structlog.get_logger()
-
-manager = ConnectionManager()
 
 
 async def handle_connection(websocket: WebSocketServerProtocol) -> None:
@@ -21,6 +19,7 @@ async def handle_connection(websocket: WebSocketServerProtocol) -> None:
             return
 
         await manager.connect(character_id, websocket)
+        await _on_map_join(character_id)
 
         async for raw in websocket:
             await _dispatch(character_id, raw)
@@ -31,6 +30,7 @@ async def handle_connection(websocket: WebSocketServerProtocol) -> None:
         logger.warning("ws_connection_error", error=str(e))
     finally:
         if character_id is not None:
+            await _on_map_leave(character_id)
             await manager.disconnect(character_id)
 
 
@@ -42,6 +42,19 @@ async def _authenticate(websocket: WebSocketServerProtocol) -> uuid.UUID | None:
     except asyncio.TimeoutError:
         await websocket.close(4001, "Auth timeout")
         return None
+
+
+async def _on_map_join(character_id: uuid.UUID) -> None:
+    from app.ws.handlers import send_map_state
+    await send_map_state(manager, character_id)
+
+
+async def _on_map_leave(character_id: uuid.UUID) -> None:
+    from app.redis_client import get_redis
+    map_id = manager.get_map(character_id)
+    if map_id:
+        r = get_redis()
+        await r.srem(f"online_players:{map_id}", str(character_id))
 
 
 async def _dispatch(character_id: uuid.UUID, raw: str) -> None:

@@ -1,1 +1,20 @@
-[]
+[
+  {
+    "id": "quest_first_steps",
+    "name": "Primeiros Passos",
+    "type": "main",
+    "description": "Explore os arredores da Vila Inicial.",
+    "objectives": [{"type": "visit_map", "map_id": "greenfield_plains", "count": 1}],
+    "rewards": {"xp": 50, "zeny": 100},
+    "requirements": {"level": 1}
+  },
+  {
+    "id": "quest_poring_hunt",
+    "name": "Cacada de Porings",
+    "type": "daily",
+    "description": "Derrote 10 Porings nas Planicies de Greenfield.",
+    "objectives": [{"type": "kill_mob", "mob_id": "poring", "count": 10}],
+    "rewards": {"xp": 200, "zeny": 500, "items": [{"item_id": "red_potion", "quantity": 5}]},
+    "requirements": {"level": 1}
+  }
+]

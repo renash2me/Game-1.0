@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 import structlog
@@ -10,12 +11,23 @@ from app.data.loader import load_all
 
 logger = structlog.get_logger()
 
+_ai_tasks: list[asyncio.Task] = []
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     load_all()
     logger.info("static_catalogs_loaded")
+
+    from app.systems.mob_spawn import initialize_all_maps
+    await initialize_all_maps()
+
     yield
+
+    for task in _ai_tasks:
+        task.cancel()
+    if _ai_tasks:
+        await asyncio.gather(*_ai_tasks, return_exceptions=True)
 
 
 app = FastAPI(

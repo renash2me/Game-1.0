@@ -1,1 +1,55 @@
-[]
+[
+  {
+    "id": "starter_village",
+    "name": "Vila Inicial",
+    "width": 800,
+    "height": 600,
+    "is_safe": true,
+    "music": "village_theme",
+    "spawn_points": [],
+    "portals": [
+      {
+        "id": "to_greenfield",
+        "dest_map": "greenfield_plains",
+        "dest_x": 60.0,
+        "dest_y": 300.0,
+        "trigger_x": 790.0,
+        "trigger_y": 300.0,
+        "radius": 24.0
+      }
+    ]
+  },
+  {
+    "id": "greenfield_plains",
+    "name": "Planícies de Greenfield",
+    "width": 1200,
+    "height": 900,
+    "is_safe": false,
+    "music": "field_theme",
+    "spawn_points": [
+      {
+        "mob_id": "poring",
+        "count": 8,
+        "respawn_seconds": 30,
+        "area": {"x1": 100.0, "y1": 100.0, "x2": 1100.0, "y2": 800.0}
+      },
+      {
+        "mob_id": "fabre",
+        "count": 5,
+        "respawn_seconds": 45,
+        "area": {"x1": 300.0, "y1": 200.0, "x2": 1000.0, "y2": 700.0}
+      }
+    ],
+    "portals": [
+      {
+        "id": "to_village",
+        "dest_map": "starter_village",
+        "dest_x": 760.0,
+        "dest_y": 300.0,
+        "trigger_x": 20.0,
+        "trigger_y": 300.0,
+        "radius": 24.0
+      }
+    ]
+  }
+]
