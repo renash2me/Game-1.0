@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     game_api_port: int = 8000
     game_ws_port: int = 8001
 
+    # Admin
+    admin_token: str = "changeme"
+
     # Environment
     environment: str = "production"
     debug: bool = False

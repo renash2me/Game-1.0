@@ -4,7 +4,9 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
+from app.api.admin import router as admin_router
 from app.api.auth import router as auth_router
 from app.api.characters import router as characters_router
 from app.api.inventory import router as inventory_router
@@ -49,10 +51,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(admin_router)
 app.include_router(auth_router)
 app.include_router(characters_router)
 app.include_router(inventory_router)
 app.include_router(quests_router)
+
+app.mount("/admin", StaticFiles(directory="/app/admin", html=True), name="admin")
 
 
 @app.get("/api/health")
