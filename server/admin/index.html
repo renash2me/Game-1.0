@@ -6,31 +6,49 @@
 <title>Aethermoor — Admin</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:system-ui,sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;display:flex}
-  aside{width:200px;background:#1a1d27;border-right:1px solid #2d3748;display:flex;flex-direction:column;flex-shrink:0}
-  aside h1{font-size:14px;font-weight:700;color:#7c3aed;padding:20px 16px;border-bottom:1px solid #2d3748;letter-spacing:.05em;text-transform:uppercase}
-  nav a{display:block;padding:10px 16px;color:#94a3b8;text-decoration:none;font-size:14px;border-left:3px solid transparent;transition:.15s}
+  body{font-family:system-ui,sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;display:flex;overflow-x:hidden}
+
+  /* ── Sidebar ── */
+  aside{width:220px;background:#1a1d27;border-right:1px solid #2d3748;display:flex;flex-direction:column;flex-shrink:0;transition:transform .25s ease}
+  aside h1{font-size:13px;font-weight:700;color:#7c3aed;padding:18px 16px;border-bottom:1px solid #2d3748;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  nav a{display:flex;align-items:center;gap:10px;padding:11px 16px;color:#94a3b8;text-decoration:none;font-size:14px;border-left:3px solid transparent;transition:.15s}
   nav a:hover{color:#e2e8f0;background:#252836}
   nav a.active{color:#a78bfa;border-left-color:#7c3aed;background:#252836}
-  main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-  header{padding:16px 24px;border-bottom:1px solid #2d3748;display:flex;align-items:center;gap:12px;background:#1a1d27}
-  header h2{font-size:18px;font-weight:600;flex:1}
-  .token-wrap{display:flex;gap:8px;align-items:center}
-  .token-wrap input{background:#252836;border:1px solid #4a5568;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:13px;width:200px}
-  .content{flex:1;overflow:auto;padding:24px}
-  .toolbar{display:flex;gap:8px;margin-bottom:16px;align-items:center}
-  .search{background:#252836;border:1px solid #4a5568;color:#e2e8f0;padding:7px 12px;border-radius:6px;font-size:13px;width:260px}
+  nav a .icon{font-size:16px;width:20px;text-align:center}
+
+  /* ── Main ── */
+  main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+  header{padding:14px 16px;border-bottom:1px solid #2d3748;display:flex;align-items:center;gap:10px;background:#1a1d27;flex-shrink:0}
+  .hamburger{display:none;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;padding:2px 6px;line-height:1}
+  header h2{font-size:17px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .token-wrap{display:flex;gap:6px;align-items:center;flex-shrink:0}
+  .token-wrap label{font-size:11px;color:#4a5568;white-space:nowrap}
+  .token-wrap input{background:#252836;border:1px solid #4a5568;color:#e2e8f0;padding:5px 8px;border-radius:6px;font-size:12px;width:140px}
+
+  /* ── Content ── */
+  .content{flex:1;overflow:auto;padding:16px;max-width:100%}
+  .toolbar{display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
+  .search{background:#252836;border:1px solid #4a5568;color:#e2e8f0;padding:8px 12px;border-radius:8px;font-size:14px;flex:1;min-width:0}
   .search::placeholder{color:#4a5568}
-  select.filter{background:#252836;border:1px solid #4a5568;color:#e2e8f0;padding:7px 10px;border-radius:6px;font-size:13px}
-  btn,button{cursor:pointer;border:none;border-radius:6px;font-size:13px;font-weight:500;padding:7px 14px;transition:.15s}
-  .btn-primary{background:#7c3aed;color:#fff}.btn-primary:hover{background:#6d28d9}
-  .btn-danger{background:#dc2626;color:#fff}.btn-danger:hover{background:#b91c1c}
-  .btn-ghost{background:#252836;color:#94a3b8;border:1px solid #4a5568}.btn-ghost:hover{color:#e2e8f0}
-  .btn-sm{padding:4px 10px;font-size:12px}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th{text-align:left;padding:8px 12px;color:#64748b;font-weight:500;border-bottom:1px solid #2d3748;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
-  td{padding:9px 12px;border-bottom:1px solid #1e2330}
-  tr:hover td{background:#1e2330}
+  select.filter{background:#252836;border:1px solid #4a5568;color:#e2e8f0;padding:8px 10px;border-radius:8px;font-size:13px}
+
+  /* ── Buttons ── */
+  button{cursor:pointer;border:none;border-radius:8px;font-size:13px;font-weight:500;padding:8px 16px;transition:.15s;font-family:inherit}
+  .btn-primary{background:#7c3aed;color:#fff}.btn-primary:active{background:#6d28d9}
+  .btn-danger{background:#dc2626;color:#fff}.btn-danger:active{background:#b91c1c}
+  .btn-ghost{background:#252836;color:#94a3b8;border:1px solid #4a5568}.btn-ghost:active{color:#e2e8f0}
+  .btn-sm{padding:5px 10px;font-size:12px;border-radius:6px}
+
+  /* ── Cards grid ── */
+  .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+  .card{background:#1a1d27;border:1px solid #2d3748;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px}
+  .card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .card-title{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .card-title strong{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card-title code{font-size:11px;color:#4a5568;background:#252836;padding:1px 6px;border-radius:4px;display:inline-block}
+  .card-actions{display:flex;gap:6px;flex-shrink:0}
+  .card-meta{display:flex;flex-wrap:wrap;gap:6px;font-size:12px;color:#64748b}
+  .card-meta span{display:flex;align-items:center;gap:3px}
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
   .badge-weapon{background:#7c3aed22;color:#a78bfa}
   .badge-equipment{background:#0ea5e922;color:#38bdf8}
@@ -40,53 +58,79 @@
   .badge-passive{background:#1e40af22;color:#60a5fa}
   .badge-aggressive{background:#dc262622;color:#f87171}
   .badge-support{background:#15803d22;color:#4ade80}
-  .empty{text-align:center;color:#4a5568;padding:48px;font-size:14px}
-  /* Modal */
-  .overlay{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:.2s}
+
+  .empty{text-align:center;color:#4a5568;padding:48px 16px;font-size:14px}
+
+  /* ── Modal ── */
+  .overlay{position:fixed;inset:0;background:#000b;display:flex;align-items:flex-end;justify-content:center;z-index:200;opacity:0;pointer-events:none;transition:.2s}
   .overlay.open{opacity:1;pointer-events:all}
-  .modal{background:#1a1d27;border:1px solid #2d3748;border-radius:12px;width:640px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column}
-  .modal-head{padding:16px 20px;border-bottom:1px solid #2d3748;display:flex;justify-content:space-between;align-items:center}
+  .modal{background:#1a1d27;border:1px solid #2d3748;border-radius:16px 16px 0 0;width:100%;max-width:680px;max-height:92vh;display:flex;flex-direction:column;transform:translateY(40px);transition:.25s}
+  .overlay.open .modal{transform:translateY(0)}
+  .modal-head{padding:14px 18px;border-bottom:1px solid #2d3748;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
   .modal-head h3{font-size:15px;font-weight:600}
-  .modal-body{padding:20px;overflow-y:auto;flex:1}
-  .modal-foot{padding:12px 20px;border-top:1px solid #2d3748;display:flex;justify-content:flex-end;gap:8px}
-  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .modal-body{padding:16px 18px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+  .modal-foot{padding:12px 18px;border-top:1px solid #2d3748;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
+
+  /* ── Form ── */
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .form-grid .full{grid-column:1/-1}
-  .field label{display:block;font-size:12px;color:#64748b;margin-bottom:4px;font-weight:500}
-  .field input,.field select,.field textarea{width:100%;background:#252836;border:1px solid #4a5568;color:#e2e8f0;padding:8px 10px;border-radius:6px;font-size:13px;font-family:inherit}
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  .field input,.field select,.field textarea{width:100%;background:#252836;border:1px solid #4a5568;color:#e2e8f0;padding:9px 10px;border-radius:8px;font-size:14px;font-family:inherit;-webkit-appearance:none}
   .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#7c3aed}
-  .field textarea{resize:vertical;min-height:120px;font-family:monospace;font-size:12px}
-  .tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid #2d3748;padding-bottom:0}
-  .tab{padding:8px 14px;font-size:13px;cursor:pointer;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-1px}
-  .tab.active{color:#a78bfa;border-bottom-color:#7c3aed}
-  .drops-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+  .field textarea{resize:vertical;min-height:100px;font-family:monospace;font-size:12px}
+
+  /* ── Drops ── */
+  .drops-list{display:flex;flex-direction:column;gap:8px;margin-top:6px}
   .drop-row{display:flex;gap:8px;align-items:center}
-  .drop-row input{flex:1}
-  .drop-row .chance{width:80px}
-  .msg{padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:12px}
+  .drop-row input{flex:1;min-width:0}
+  .drop-row .chance{width:90px;flex-shrink:0}
+
+  /* ── Messages ── */
+  .msg{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px}
   .msg.error{background:#dc262622;color:#f87171;border:1px solid #dc262644}
   .msg.success{background:#16a34a22;color:#4ade80;border:1px solid #16a34a44}
+
+  /* ── Overlay backdrop for sidebar on mobile ── */
+  .sidebar-backdrop{display:none;position:fixed;inset:0;background:#000a;z-index:99}
+  .sidebar-backdrop.open{display:block}
+
+  /* ── Mobile ── */
+  @media(max-width:640px){
+    aside{position:fixed;top:0;left:0;bottom:0;z-index:100;transform:translateX(-100%)}
+    aside.open{transform:translateX(0)}
+    .hamburger{display:block}
+    .token-wrap input{width:110px}
+    .form-grid{grid-template-columns:1fr}
+    .form-grid .full{grid-column:1}
+    .modal{border-radius:20px 20px 0 0;max-height:95vh}
+    .cards-grid{grid-template-columns:1fr}
+  }
 </style>
 </head>
 <body>
 
-<aside>
+<div class="sidebar-backdrop" id="backdrop"></div>
+
+<aside id="sidebar">
   <h1>⚔ Aethermoor</h1>
   <nav id="nav">
-    <a href="#" data-cat="items" class="active">🗡 Itens</a>
-    <a href="#" data-cat="monsters">👾 Monstros</a>
-    <a href="#" data-cat="maps">🗺 Mapas</a>
-    <a href="#" data-cat="cards">🃏 Cards</a>
-    <a href="#" data-cat="skills">✨ Skills</a>
-    <a href="#" data-cat="quests">📜 Quests</a>
+    <a href="#" data-cat="items" class="active"><span class="icon">🗡</span>Itens</a>
+    <a href="#" data-cat="monsters"><span class="icon">👾</span>Monstros</a>
+    <a href="#" data-cat="maps"><span class="icon">🗺</span>Mapas</a>
+    <a href="#" data-cat="cards"><span class="icon">🃏</span>Cards</a>
+    <a href="#" data-cat="skills"><span class="icon">✨</span>Skills</a>
+    <a href="#" data-cat="quests"><span class="icon">📜</span>Quests</a>
   </nav>
 </aside>
 
 <main>
   <header>
+    <button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
     <h2 id="title">Itens</h2>
     <div class="token-wrap">
-      <span style="font-size:12px;color:#4a5568">Token:</span>
-      <input type="password" id="token" placeholder="admin token" value="">
+      <label>Token</label>
+      <input type="password" id="token" placeholder="admin token">
     </div>
   </header>
 
@@ -97,7 +141,7 @@
       <button class="btn-primary" id="btn-new">+ Novo</button>
     </div>
     <div id="msg-area"></div>
-    <div id="table-area"></div>
+    <div id="cards-area"></div>
   </div>
 </main>
 
@@ -122,6 +166,18 @@ let currentCat = 'items';
 let currentData = [];
 let editingId = null;
 
+// ── Sidebar toggle ────────────────────────────────────────────────────────────
+const sidebar = document.getElementById('sidebar');
+const backdrop = document.getElementById('backdrop');
+
+function openSidebar() { sidebar.classList.add('open'); backdrop.classList.add('open'); }
+function closeSidebar() { sidebar.classList.remove('open'); backdrop.classList.remove('open'); }
+
+document.getElementById('hamburger').addEventListener('click', () =>
+  sidebar.classList.contains('open') ? closeSidebar() : openSidebar()
+);
+backdrop.addEventListener('click', closeSidebar);
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function token() { return document.getElementById('token').value.trim(); }
 
@@ -145,8 +201,9 @@ document.getElementById('nav').addEventListener('click', e => {
   document.querySelectorAll('nav a').forEach(x => x.classList.remove('active'));
   a.classList.add('active');
   currentCat = a.dataset.cat;
-  document.getElementById('title').textContent = a.textContent.trim();
+  document.getElementById('title').textContent = a.querySelector('.icon').nextSibling.textContent.trim();
   document.getElementById('search').value = '';
+  closeSidebar();
   loadCatalog();
 });
 
@@ -154,8 +211,8 @@ document.getElementById('nav').addEventListener('click', e => {
 async function loadCatalog() {
   try {
     currentData = await api('GET', '/' + currentCat);
-    renderTable(currentData);
     buildFilter(currentData);
+    renderCards(filtered());
   } catch(e) { showMsg(e.message, 'error'); }
 }
 
@@ -178,64 +235,63 @@ function buildFilter(data) {
   } else { sel.style.display = 'none'; }
 }
 
-document.getElementById('search').addEventListener('input', () => renderTable(filtered()));
-document.getElementById('type-filter').addEventListener('change', () => renderTable(filtered()));
-
-function renderTable(data) {
-  const area = document.getElementById('table-area');
-  if (!data.length) { area.innerHTML = '<div class="empty">Nenhum registro encontrado.</div>'; return; }
-  const cols = tableCols(currentCat);
-  area.innerHTML = `<table>
-    <thead><tr>${cols.map(c=>`<th>${c.label}</th>`).join('')}<th></th></tr></thead>
-    <tbody>${data.map(row => `<tr>
-      ${cols.map(c => `<td>${c.render(row)}</td>`).join('')}
-      <td style="width:120px;text-align:right">
-        <button class="btn-ghost btn-sm" onclick="openEdit('${row.id}')">Editar</button>
-        <button class="btn-danger btn-sm" onclick="doDelete('${row.id}')" style="margin-left:4px">✕</button>
-      </td>
-    </tr>`).join('')}</tbody>
-  </table>`;
-}
+document.getElementById('search').addEventListener('input', () => renderCards(filtered()));
+document.getElementById('type-filter').addEventListener('change', () => renderCards(filtered()));
 
 function badge(val) { return `<span class="badge badge-${val}">${val}</span>`; }
 
-function tableCols(cat) {
-  if (cat === 'items') return [
-    { label:'ID', render: r => `<code>${r.id}</code>` },
-    { label:'Nome', render: r => r.name },
-    { label:'Tipo', render: r => badge(r.type) },
-    { label:'Peso', render: r => r.weight ?? '—' },
-    { label:'ATK', render: r => r.atk ?? '—' },
-    { label:'Compra/Venda', render: r => r.buy_price ? `${r.buy_price}/${r.sell_price}` : r.sell_price ?? '—' },
-  ];
-  if (cat === 'monsters') return [
-    { label:'ID', render: r => `<code>${r.id}</code>` },
-    { label:'Nome', render: r => r.name },
-    { label:'Nível', render: r => r.level },
-    { label:'HP', render: r => r.hp_max },
-    { label:'XP', render: r => r.base_xp },
-    { label:'IA', render: r => badge(r.ai_type) },
-    { label:'Drops', render: r => r.drops?.length ?? 0 },
-  ];
-  if (cat === 'maps') return [
-    { label:'ID', render: r => `<code>${r.id}</code>` },
-    { label:'Nome', render: r => r.name },
-    { label:'Tamanho', render: r => `${r.width}×${r.height}` },
-    { label:'Seguro', render: r => r.is_safe ? '✅' : '❌' },
-    { label:'Portais', render: r => r.portals?.length ?? 0 },
-    { label:'Spawns', render: r => r.spawn_points?.length ?? 0 },
-  ];
-  if (cat === 'cards') return [
-    { label:'ID', render: r => `<code>${r.id}</code>` },
-    { label:'Nome', render: r => r.name },
-    { label:'Slot', render: r => r.slot ?? '—' },
-    { label:'Efeito', render: r => JSON.stringify(r.effect ?? {}) },
-  ];
-  // generic
-  return [
-    { label:'ID', render: r => `<code>${r.id}</code>` },
-    { label:'Nome', render: r => r.name ?? '—' },
-  ];
+function renderCards(data) {
+  const area = document.getElementById('cards-area');
+  if (!data.length) { area.innerHTML = '<div class="empty">Nenhum registro encontrado.</div>'; return; }
+  area.innerHTML = `<div class="cards-grid">${data.map(row => buildCard(row)).join('')}</div>`;
+}
+
+function buildCard(row) {
+  const { title, meta } = cardContent(currentCat, row);
+  return `<div class="card">
+    <div class="card-header">
+      <div class="card-title">
+        <strong>${row.name || row.id}</strong>
+        <code>${row.id}</code>
+      </div>
+      <div class="card-actions">
+        <button class="btn-ghost btn-sm" onclick="openEdit('${row.id}')">Editar</button>
+        <button class="btn-danger btn-sm" onclick="doDelete('${row.id}')">✕</button>
+      </div>
+    </div>
+    <div class="card-meta">${meta}</div>
+  </div>`;
+}
+
+function cardContent(cat, r) {
+  if (cat === 'items') return { meta: `
+    ${badge(r.type)}
+    ${r.atk ? `<span>⚔ ATK ${r.atk}</span>` : ''}
+    ${r.def ? `<span>🛡 DEF ${r.def}</span>` : ''}
+    ${r.weight ? `<span>⚖ ${r.weight}</span>` : ''}
+    ${r.buy_price ? `<span>💰 ${r.buy_price}/${r.sell_price}</span>` : r.sell_price ? `<span>💰 ${r.sell_price}</span>` : ''}
+    ${r.effect?.hp_restore ? `<span>❤️ +${r.effect.hp_restore} HP</span>` : ''}
+    ${r.effect?.sp_restore ? `<span>💙 +${r.effect.sp_restore} SP</span>` : ''}
+  `};
+  if (cat === 'monsters') return { meta: `
+    ${badge(r.ai_type)}
+    <span>⭐ Lv.${r.level}</span>
+    <span>❤️ ${r.hp_max} HP</span>
+    <span>✨ ${r.base_xp} XP</span>
+    <span>💀 ${r.drops?.length ?? 0} drops</span>
+    <span>${r.element} / ${r.race}</span>
+  `};
+  if (cat === 'maps') return { meta: `
+    <span>📐 ${r.width}×${r.height}</span>
+    <span>${r.is_safe ? '🛡 Seguro' : '⚔ PvP'}</span>
+    <span>🚪 ${r.portals?.length ?? 0} portais</span>
+    <span>👾 ${r.spawn_points?.length ?? 0} spawns</span>
+  `};
+  if (cat === 'cards') return { meta: `
+    ${r.slot ? `<span>🎴 Slot: ${r.slot}</span>` : ''}
+    ${r.effect ? `<span>${JSON.stringify(r.effect)}</span>` : ''}
+  `};
+  return { meta: `<span>${JSON.stringify(r).slice(0,80)}…</span>` };
 }
 
 // ── Delete ────────────────────────────────────────────────────────────────────
@@ -252,9 +308,11 @@ async function doDelete(id) {
 function openModal(title) {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
 function closeModal() {
   document.getElementById('overlay').classList.remove('open');
+  document.body.style.overflow = '';
   editingId = null;
 }
 document.getElementById('modal-close').onclick = closeModal;
@@ -283,8 +341,8 @@ function field(id, label, value='', type='text', opts={}) {
     const sel = opts.options.map(o => `<option value="${o}" ${o===v?'selected':''}>${o}</option>`).join('');
     return `<div class="field"><label>${label}</label><select id="${id}">${sel}</select></div>`;
   }
-  if (type === 'textarea') return `<div class="field full"><label>${label}</label><textarea id="${id}" rows="5">${v}</textarea></div>`;
-  return `<div class="field"><label>${label}</label><input type="${type}" id="${id}" value="${v}"></div>`;
+  if (type === 'textarea') return `<div class="field full"><label>${label}</label><textarea id="${id}" rows="4">${v}</textarea></div>`;
+  return `<div class="field"><label>${label}</label><input type="${type}" id="${id}" value="${v}" inputmode="${type==='number'?'decimal':'text'}"></div>`;
 }
 
 function buildForm(cat, data) {
@@ -292,7 +350,6 @@ function buildForm(cat, data) {
   if (cat === 'items') return buildItemForm(d);
   if (cat === 'monsters') return buildMonsterForm(d);
   if (cat === 'maps') return buildMapForm(d);
-  // generic JSON editor
   return `<div class="form-grid">
     ${field('f_id','ID',d.id)}
     <div></div>
@@ -303,7 +360,6 @@ function buildForm(cat, data) {
 function buildItemForm(d) {
   const types = ['material','consumable','weapon','equipment','zeny_bag'];
   const slots = ['weapon','head_upper','head_mid','head_lower','armor','garment','footgear','accessory1','accessory2'];
-  const effect = d.effect ? JSON.stringify(d.effect) : '';
   const req = d.requirements ? JSON.stringify(d.requirements) : '';
   return `<div class="form-grid">
     ${field('f_id','ID *',d.id)}
@@ -326,10 +382,10 @@ function buildItemForm(d) {
 }
 
 function buildMonsterForm(d) {
-  const ais = ['passive','aggressive','support'];
-  const sizes = ['small','medium','large'];
-  const elements = ['neutral','water','fire','wind','earth','holy','shadow','ghost','undead'];
-  const races = ['plant','insect','fish','angel','demon','humanoid','dragon','formless','undead','brute'];
+  const ais=['passive','aggressive','support'];
+  const sizes=['small','medium','large'];
+  const elements=['neutral','water','fire','wind','earth','holy','shadow','ghost','undead'];
+  const races=['plant','insect','fish','angel','demon','humanoid','dragon','formless','undead','brute'];
   return `<div class="form-grid">
     ${field('f_id','ID *',d.id)}
     ${field('f_name','Nome *',d.name)}
@@ -356,7 +412,7 @@ function buildMonsterForm(d) {
     <div class="field full">
       <label>Drops</label>
       <div id="drops-list" class="drops-list"></div>
-      <button class="btn-ghost btn-sm" style="margin-top:6px" onclick="addDrop()">+ Drop</button>
+      <button class="btn-ghost btn-sm" style="margin-top:8px;width:fit-content" onclick="addDrop()">+ Drop</button>
     </div>
   </div>`;
 }
@@ -376,23 +432,17 @@ function buildMapForm(d) {
 
 // ── Drops UI ──────────────────────────────────────────────────────────────────
 let dropsData = [];
-
-function initDropsUI(drops=[]) {
-  dropsData = drops ? drops.map(d=>({...d})) : [];
-  renderDrops();
-}
-
+function initDropsUI(drops=[]) { dropsData = drops ? drops.map(d=>({...d})) : []; renderDrops(); }
 function renderDrops() {
   const el = document.getElementById('drops-list');
   if (!el) return;
   el.innerHTML = dropsData.map((d,i) => `
     <div class="drop-row">
       <input placeholder="item_id" value="${d.item_id||''}" oninput="dropsData[${i}].item_id=this.value">
-      <input class="chance" placeholder="chance 0-1" type="number" step="0.0001" min="0" max="1" value="${d.chance??''}" oninput="dropsData[${i}].chance=parseFloat(this.value)||0">
+      <input class="chance" placeholder="0.0-1.0" type="number" step="0.0001" min="0" max="1" value="${d.chance??''}" oninput="dropsData[${i}].chance=parseFloat(this.value)||0" inputmode="decimal">
       <button class="btn-danger btn-sm" onclick="removeDrop(${i})">✕</button>
     </div>`).join('');
 }
-
 function addDrop() { dropsData.push({item_id:'',chance:0.1}); renderDrops(); }
 function removeDrop(i) { dropsData.splice(i,1); renderDrops(); }
 
@@ -412,54 +462,43 @@ document.getElementById('modal-save').addEventListener('click', async () => {
 function v(id) { const el=document.getElementById(id); return el?el.value.trim():undefined; }
 function vn(id) { const val=v(id); return val===''||val===undefined?undefined:Number(val); }
 function vb(id) { return v(id)==='true'; }
-
-function collectForm(cat) {
-  if (cat === 'items') return collectItem();
-  if (cat === 'monsters') return collectMonster();
-  if (cat === 'maps') return collectMap();
-  // generic
-  try { return JSON.parse(v('f_json')); } catch(e) { throw new Error('JSON inválido'); }
-}
-
 function omit(obj) { return Object.fromEntries(Object.entries(obj).filter(([,v])=>v!==undefined&&v!==''&&v!==null&&!Number.isNaN(v))); }
 
+function collectForm(cat) {
+  if (cat==='items') return collectItem();
+  if (cat==='monsters') return collectMonster();
+  if (cat==='maps') return collectMap();
+  try { return JSON.parse(v('f_json')); } catch { throw new Error('JSON inválido'); }
+}
+
 function collectItem() {
-  const base = omit({
-    id: v('f_id'), name: v('f_name'), type: v('f_type'),
-    stackable: vb('f_stackable'), weight: vn('f_weight'),
-    buy_price: vn('f_buy_price'), sell_price: vn('f_sell_price'),
-    atk: vn('f_atk'), matk: vn('f_matk'), def: vn('f_def'),
-    slots: vn('f_slots'), equip_slot: v('f_equip_slot')||undefined,
-    zeny_amount: vn('f_zeny_amount'),
-  });
-  const hp_r = vn('f_hp_restore'), sp_r = vn('f_sp_restore');
-  if (hp_r || sp_r) base.effect = omit({hp_restore:hp_r, sp_restore:sp_r});
-  const req = v('f_requirements');
-  if (req) try { base.requirements = JSON.parse(req); } catch {}
+  const base = omit({ id:v('f_id'), name:v('f_name'), type:v('f_type'), stackable:vb('f_stackable'),
+    weight:vn('f_weight'), buy_price:vn('f_buy_price'), sell_price:vn('f_sell_price'),
+    atk:vn('f_atk'), matk:vn('f_matk'), def:vn('f_def'), slots:vn('f_slots'),
+    equip_slot:v('f_equip_slot')||undefined, zeny_amount:vn('f_zeny_amount') });
+  const hp_r=vn('f_hp_restore'), sp_r=vn('f_sp_restore');
+  if (hp_r||sp_r) base.effect = omit({hp_restore:hp_r, sp_restore:sp_r});
+  const req=v('f_requirements');
+  if (req) try { base.requirements=JSON.parse(req); } catch {}
   return base;
 }
 
 function collectMonster() {
-  return omit({
-    id:v('f_id'), name:v('f_name'), level:vn('f_level'), hp_max:vn('f_hp_max'),
-    base_xp:vn('f_base_xp'), job_xp:vn('f_job_xp'),
-    str:vn('f_str'), agi:vn('f_agi'), vit:vn('f_vit'), int_:vn('f_int_'), dex:vn('f_dex'), luk:vn('f_luk'),
+  return omit({ id:v('f_id'), name:v('f_name'), level:vn('f_level'), hp_max:vn('f_hp_max'),
+    base_xp:vn('f_base_xp'), job_xp:vn('f_job_xp'), str:vn('f_str'), agi:vn('f_agi'),
+    vit:vn('f_vit'), int_:vn('f_int_'), dex:vn('f_dex'), luk:vn('f_luk'),
     attack_min:vn('f_attack_min'), attack_max:vn('f_attack_max'), defense:vn('f_defense'),
     move_speed:vn('f_move_speed'), attack_range:vn('f_attack_range'), aggro_range:vn('f_aggro_range'),
     ai_type:v('f_ai_type'), size:v('f_size'), element:v('f_element'), race:v('f_race'),
-    drops: dropsData.filter(d=>d.item_id),
-  });
+    drops: dropsData.filter(d=>d.item_id) });
 }
 
 function collectMap() {
-  const portals = v('f_portals');
-  const spawns = v('f_spawn_points');
-  return omit({
-    id:v('f_id'), name:v('f_name'), width:vn('f_width'), height:vn('f_height'),
+  const portals=v('f_portals'), spawns=v('f_spawn_points');
+  return omit({ id:v('f_id'), name:v('f_name'), width:vn('f_width'), height:vn('f_height'),
     music:v('f_music'), is_safe:vb('f_is_safe'),
     portals: portals ? JSON.parse(portals) : [],
-    spawn_points: spawns ? JSON.parse(spawns) : [],
-  });
+    spawn_points: spawns ? JSON.parse(spawns) : [] });
 }
 
 // ── Messages ──────────────────────────────────────────────────────────────────
@@ -469,7 +508,6 @@ function showMsg(text, type='error') {
   setTimeout(()=>{ if(el.children[0]?.textContent===text) el.innerHTML=''; }, 4000);
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
 loadCatalog();
 </script>
 </body>
