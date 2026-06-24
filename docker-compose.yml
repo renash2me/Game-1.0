@@ -1,0 +1,88 @@
+networks:
+  aethermoor_net:
+    driver: bridge
+    name: aethermoor_net
+
+volumes:
+  aethermoor_pgdata:
+  aethermoor_redis_data:
+
+services:
+  postgres-game:
+    image: postgres:16
+    container_name: aethermoor_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - aethermoor_pgdata:/var/lib/postgresql/data
+    networks:
+      - aethermoor_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-game:
+    image: redis:7-alpine
+    container_name: aethermoor_redis
+    restart: unless-stopped
+    volumes:
+      - aethermoor_redis_data:/data
+    networks:
+      - aethermoor_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  game-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    platform: linux/arm64
+    container_name: aethermoor_server
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres-game:
+        condition: service_healthy
+      redis-game:
+        condition: service_healthy
+    networks:
+      - aethermoor_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aethermoor_net"
+      # REST API → porta 8000
+      - "traefik.http.routers.game-api.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.game-api.entrypoints=web"
+      - "traefik.http.routers.game-api.service=game-api-svc"
+      - "traefik.http.services.game-api-svc.loadbalancer.server.port=8000"
+      # WebSocket → porta 8001
+      - "traefik.http.routers.game-ws.rule=PathPrefix(`/ws`)"
+      - "traefik.http.routers.game-ws.entrypoints=web"
+      - "traefik.http.routers.game-ws.service=game-ws-svc"
+      - "traefik.http.services.game-ws-svc.loadbalancer.server.port=8001"
+
+  traefik-game:
+    image: traefik:v3
+    container_name: aethermoor_traefik
+    restart: unless-stopped
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=aethermoor_net"
+      - "--entrypoints.web.address=:80"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    ports:
+      - "7080:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - aethermoor_net

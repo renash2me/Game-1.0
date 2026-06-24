@@ -1,0 +1,22 @@
+services:
+  game-server:
+    volumes:
+      - ./server:/app
+    environment:
+      DEBUG: "true"
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+
+  traefik-game:
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=aethermoor_net"
+      - "--entrypoints.web.address=:80"
+      - "--api.insecure=true"
+      - "--log.level=DEBUG"
+      - "--accesslog=true"
+    ports:
+      - "7080:80"
+      - "7088:8080"
