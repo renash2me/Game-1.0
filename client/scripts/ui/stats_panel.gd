@@ -9,45 +9,63 @@ const _STAT_DEFS = [
 	["luk",  "LUK"],
 ]
 
-var _pending        : Dictionary = {}
-var _current_labels : Dictionary = {}
-var _pending_labels : Dictionary = {}
+var _pending        : Dictionary    = {}
+var _current_labels : Dictionary    = {}
+var _pending_labels : Dictionary    = {}
 var _avail_label    : Label
 var _apply_btn      : Button
+var _panel          : PanelContainer
+var _drag_offset    : Vector2       = Vector2.ZERO
+var _dragging       : bool          = false
 
 func _ready() -> void:
 	for d in _STAT_DEFS:
 		_pending[d[0]] = 0
 	_build_ui()
 	_refresh()
+	call_deferred("_center_panel")
 
 func _build_ui() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	mouse_filter = Control.MOUSE_FILTER_PASS
 
 	var overlay := ColorRect.new()
-	overlay.color = Color(0, 0, 0, 0.65)
+	overlay.color = Color(0, 0, 0, 0.55)
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(overlay)
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_PASS
-	add_child(center)
-
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(320, 0)
-	center.add_child(panel)
+	_panel = PanelContainer.new()
+	_panel.custom_minimum_size = Vector2(320, 0)
+	add_child(_panel)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 6)
-	panel.add_child(vbox)
+	_panel.add_child(vbox)
 
-	var title := Label.new()
-	title.text = "Atributos"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 16)
-	vbox.add_child(title)
+	# Barra de titulo arrastavel
+	var title_bar := HBoxContainer.new()
+	title_bar.custom_minimum_size = Vector2(0, 26)
+	title_bar.add_theme_constant_override("separation", 4)
+	title_bar.mouse_filter = Control.MOUSE_FILTER_STOP
+	title_bar.mouse_default_cursor_shape = Control.CURSOR_MOVE
+	title_bar.gui_input.connect(_on_title_drag)
+	vbox.add_child(title_bar)
+
+	var title_lbl := Label.new()
+	title_lbl.text = ":: Atributos"
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_lbl.add_theme_font_size_override("font_size", 14)
+	title_lbl.mouse_filter = Control.MOUSE_FILTER_PASS
+	title_bar.add_child(title_lbl)
+
+	var close_x := Button.new()
+	close_x.text = "X"
+	close_x.custom_minimum_size = Vector2(24, 0)
+	close_x.pressed.connect(_on_close_pressed)
+	title_bar.add_child(close_x)
+
+	vbox.add_child(HSeparator.new())
 
 	_avail_label = Label.new()
 	_avail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -78,6 +96,16 @@ func _build_ui() -> void:
 	close_btn.pressed.connect(_on_close_pressed)
 	btn_row.add_child(close_btn)
 
+func _center_panel() -> void:
+	var vp := get_viewport()
+	if vp == null or _panel == null:
+		return
+	var vp_size := vp.get_visible_rect().size
+	_panel.position = Vector2(
+		(vp_size.x - 320.0) * 0.5,
+		(vp_size.y - 380.0) * 0.5
+	)
+
 func _build_stat_row(parent: Control, key: String, abbr: String) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
@@ -85,7 +113,7 @@ func _build_stat_row(parent: Control, key: String, abbr: String) -> void:
 
 	var name_lbl := Label.new()
 	name_lbl.text = abbr
-	name_lbl.custom_minimum_size = Vector2(32, 0)
+	name_lbl.custom_minimum_size = Vector2(34, 0)
 	name_lbl.add_theme_font_size_override("font_size", 12)
 	row.add_child(name_lbl)
 
@@ -105,7 +133,7 @@ func _build_stat_row(parent: Control, key: String, abbr: String) -> void:
 
 	var pending_lbl := Label.new()
 	pending_lbl.text = "+0"
-	pending_lbl.custom_minimum_size = Vector2(30, 0)
+	pending_lbl.custom_minimum_size = Vector2(32, 0)
 	pending_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pending_lbl.add_theme_font_size_override("font_size", 12)
 	pending_lbl.modulate = Color(1.0, 0.9, 0.3)
@@ -117,6 +145,24 @@ func _build_stat_row(parent: Control, key: String, abbr: String) -> void:
 	plus_btn.custom_minimum_size = Vector2(28, 0)
 	plus_btn.pressed.connect(_on_plus.bind(key))
 	row.add_child(plus_btn)
+
+# ── Drag ──────────────────────────────────────────────────────────────────────
+
+func _on_title_drag(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_dragging = event.pressed
+		if event.pressed:
+			_drag_offset = _panel.position - get_local_mouse_position()
+
+func _input(event: InputEvent) -> void:
+	if not visible or not _dragging:
+		return
+	if event is InputEventMouseMotion:
+		_panel.position = get_local_mouse_position() + _drag_offset
+	elif event is InputEventMouseButton and not event.pressed:
+		_dragging = false
+
+# ── Refresh ───────────────────────────────────────────────────────────────────
 
 func _refresh() -> void:
 	if _current_labels.is_empty():

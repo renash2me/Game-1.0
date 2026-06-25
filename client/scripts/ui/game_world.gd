@@ -26,6 +26,7 @@ var _last_sent  : Vector2 = Vector2.ZERO
 func _ready() -> void:
 	_local_name = str(GameState.character.get("name", ""))
 	CharacterData.apply_from_response(GameState.character)
+	_add_ground()
 
 	var px : float = GameState.character.get("pos_x", 0.0)
 	var py : float = GameState.character.get("pos_y", 0.0)
@@ -33,13 +34,34 @@ func _ready() -> void:
 	_ensure_local_player(px, py)
 	_camera.position = Vector2(px, py)
 
-	# Conecta mensagens WS
 	WsClient.message_received.connect(_on_ws_message)
 	WsClient.ws_disconnected.connect(_on_ws_disconnected)
 
-	# Carrega mapa
 	var map_id : String = GameState.character.get("current_map", "starter_village")
 	MapManager.load_map(map_id)
+
+func _add_ground() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = -10
+	add_child(layer)
+	var ground := ColorRect.new()
+	ground.color = Color(0.17, 0.24, 0.12)
+	ground.size = Vector2(8000, 8000)
+	ground.position = Vector2(-4000, -4000)
+	layer.add_child(ground)
+	# Grade sutil para dar sensacao de profundidade
+	for gx in range(-20, 21):
+		var line := ColorRect.new()
+		line.color = Color(0.0, 0.0, 0.0, 0.08)
+		line.size = Vector2(1, 8000)
+		line.position = Vector2(gx * 64 - 0.5, -4000)
+		layer.add_child(line)
+	for gy in range(-20, 21):
+		var line := ColorRect.new()
+		line.color = Color(0.0, 0.0, 0.0, 0.08)
+		line.size = Vector2(8000, 1)
+		line.position = Vector2(-4000, gy * 64 - 0.5)
+		layer.add_child(line)
 
 # ── Input ─────────────────────────────────────────────────────────────────────
 
@@ -258,17 +280,46 @@ func _get_local_player_node() -> Node2D:
 func _build_player_node(pname: String, color: Color) -> Node2D:
 	var root := Node2D.new()
 
-	var sprite := ColorRect.new()
-	sprite.size = Vector2(16, 24)
-	sprite.position = Vector2(-8, -24)
-	sprite.color = color
-	root.add_child(sprite)
+	# Sombra
+	var shadow := ColorRect.new()
+	shadow.size = Vector2(18, 6)
+	shadow.position = Vector2(-9, -4)
+	shadow.color = Color(0, 0, 0, 0.28)
+	root.add_child(shadow)
 
+	# Corpo
+	var body := ColorRect.new()
+	body.size = Vector2(14, 16)
+	body.position = Vector2(-7, -22)
+	body.color = color
+	root.add_child(body)
+
+	# Cabeca
+	var head := ColorRect.new()
+	head.size = Vector2(12, 11)
+	head.position = Vector2(-6, -35)
+	head.color = color.lightened(0.18)
+	root.add_child(head)
+
+	# Olhos
+	var el := ColorRect.new()
+	el.size = Vector2(3, 3)
+	el.position = Vector2(-4, -32)
+	el.color = Color(0.05, 0.05, 0.05)
+	root.add_child(el)
+
+	var er := ColorRect.new()
+	er.size = Vector2(3, 3)
+	er.position = Vector2(1, -32)
+	er.color = Color(0.05, 0.05, 0.05)
+	root.add_child(er)
+
+	# Nome
 	var lbl := Label.new()
 	lbl.text = pname
-	lbl.position = Vector2(-24, -40)
+	lbl.position = Vector2(-28, -50)
 	lbl.add_theme_font_size_override("font_size", 10)
-	lbl.modulate = Color(1, 1, 0.6)
+	lbl.modulate = Color(1.0, 1.0, 0.7)
 	root.add_child(lbl)
 
 	return root
@@ -277,18 +328,60 @@ func _spawn_mob(mob: Dictionary) -> void:
 	var iid : String = mob.get("instance_id", "")
 	if iid in _mobs:
 		return
+	var mob_id : String = mob.get("monster_id", "mob")
 	var root := Node2D.new()
-	var sprite := ColorRect.new()
-	sprite.size = Vector2(16, 16)
-	sprite.position = Vector2(-8, -16)
-	sprite.color = Color(1.0, 0.3, 0.3)
-	root.add_child(sprite)
 
+	# Sombra
+	var shadow := ColorRect.new()
+	shadow.size = Vector2(22, 6)
+	shadow.position = Vector2(-11, -4)
+	shadow.color = Color(0, 0, 0, 0.25)
+	root.add_child(shadow)
+
+	# Corpo arredondado (simulado com rects sobrepostos)
+	var body := ColorRect.new()
+	body.size = Vector2(20, 16)
+	body.position = Vector2(-10, -20)
+	body.color = Color(0.95, 0.3, 0.3)
+	root.add_child(body)
+
+	var body_top := ColorRect.new()
+	body_top.size = Vector2(16, 4)
+	body_top.position = Vector2(-8, -24)
+	body_top.color = Color(0.95, 0.3, 0.3)
+	root.add_child(body_top)
+
+	# Olhos brancos + pupila
+	var ew_l := ColorRect.new()
+	ew_l.size = Vector2(5, 5)
+	ew_l.position = Vector2(-7, -18)
+	ew_l.color = Color(1, 1, 1)
+	root.add_child(ew_l)
+
+	var ep_l := ColorRect.new()
+	ep_l.size = Vector2(2, 3)
+	ep_l.position = Vector2(-6, -17)
+	ep_l.color = Color(0.1, 0.05, 0.05)
+	root.add_child(ep_l)
+
+	var ew_r := ColorRect.new()
+	ew_r.size = Vector2(5, 5)
+	ew_r.position = Vector2(2, -18)
+	ew_r.color = Color(1, 1, 1)
+	root.add_child(ew_r)
+
+	var ep_r := ColorRect.new()
+	ep_r.size = Vector2(2, 3)
+	ep_r.position = Vector2(3, -17)
+	ep_r.color = Color(0.1, 0.05, 0.05)
+	root.add_child(ep_r)
+
+	# Nome do mob
 	var lbl := Label.new()
-	lbl.text = mob.get("monster_id", "mob")
-	lbl.position = Vector2(-16, -28)
+	lbl.text = mob_id
+	lbl.position = Vector2(-20, -35)
 	lbl.add_theme_font_size_override("font_size", 9)
-	lbl.modulate = Color(1.0, 0.5, 0.5)
+	lbl.modulate = Color(1.0, 0.6, 0.6)
 	root.add_child(lbl)
 
 	root.position = Vector2(mob.get("x", 0.0), mob.get("y", 0.0))
@@ -297,24 +390,49 @@ func _spawn_mob(mob: Dictionary) -> void:
 
 func _build_drop_node(_drop_id: String, pos: Vector2) -> Node2D:
 	var root := Node2D.new()
-	var dot := ColorRect.new()
-	dot.size = Vector2(8, 8)
-	dot.position = Vector2(-4, -4)
-	dot.color = Color(1.0, 1.0, 0.2)
-	root.add_child(dot)
+
+	# Brilho externo
+	var glow := ColorRect.new()
+	glow.size = Vector2(14, 14)
+	glow.position = Vector2(-7, -7)
+	glow.color = Color(1.0, 0.9, 0.1, 0.35)
+	root.add_child(glow)
+
+	# Gema
+	var gem := ColorRect.new()
+	gem.size = Vector2(9, 9)
+	gem.position = Vector2(-4.5, -4.5)
+	gem.color = Color(1.0, 0.85, 0.0)
+	root.add_child(gem)
+
+	# Reflexo
+	var shine := ColorRect.new()
+	shine.size = Vector2(3, 3)
+	shine.position = Vector2(-3.5, -3.5)
+	shine.color = Color(1.0, 1.0, 0.95)
+	root.add_child(shine)
+
 	root.position = pos
+
+	# Animacao de bobbing
+	var tw := root.create_tween()
+	tw.set_loops()
+	tw.tween_property(root, "position:y", pos.y - 5.0, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(root, "position:y", pos.y, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
 	return root
 
 func _spawn_damage_label(pos: Vector2, text: String) -> void:
 	var lbl := Label.new()
 	lbl.text = text
-	lbl.position = pos + Vector2(-10, -20)
-	lbl.add_theme_font_size_override("font_size", 14)
-	lbl.modulate = Color(1.0, 0.2, 0.2)
+	var offset := Vector2(randf_range(-8.0, 8.0), -20.0)
+	lbl.position = pos + offset
+	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.modulate = Color(1.0, 0.88, 0.1)
 	add_child(lbl)
 	var tween := create_tween()
-	tween.tween_property(lbl, "position", lbl.position + Vector2(0, -30), 0.8)
-	tween.parallel().tween_property(lbl, "modulate:a", 0.0, 0.8)
+	tween.tween_property(lbl, "position", lbl.position + Vector2(0, -42), 0.7)
+	tween.parallel().tween_property(lbl, "modulate:a", 0.0, 0.7)
 	tween.tween_callback(lbl.queue_free)
 
 # ── Desconexão ────────────────────────────────────────────────────────────────

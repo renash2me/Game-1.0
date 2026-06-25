@@ -9,7 +9,24 @@ extends Control
 @onready var _reg_err    : Label    = $Center/VBox/Tabs/Registro/Error
 
 func _ready() -> void:
+	_add_background()
 	GameState.clear()
+
+func _add_background() -> void:
+	var bg := TextureRect.new()
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.stretch_mode = TextureRect.STRETCH_FILL
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.04, 0.06, 0.18))
+	grad.set_color(1, Color(0.08, 0.03, 0.14))
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.fill_from = Vector2(0.0, 0.0)
+	tex.fill_to   = Vector2(0.0, 1.0)
+	bg.texture = tex
+	add_child(bg)
+	move_child(bg, 0)
 
 # ── Login ─────────────────────────────────────────────────────────────────────
 
