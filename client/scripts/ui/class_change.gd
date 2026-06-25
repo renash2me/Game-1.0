@@ -3,10 +3,11 @@ extends Control
 signal class_chosen(class_id: String)
 signal dismissed()
 
-var _classes          : Array         = []
-var _cards_container  : VBoxContainer
-var _status_label     : Label
-var _scroll           : ScrollContainer
+var _classes         : Array         = []
+var _cards_container : VBoxContainer
+var _status_label    : Label
+var _scroll          : ScrollContainer
+var _pending_class   : String        = ""
 
 func _ready() -> void:
 	_build_ui()
@@ -39,7 +40,7 @@ func _build_ui() -> void:
 	vbox.add_child(title)
 
 	var sub := Label.new()
-	sub.text = "Você atingiu Lv.25! Escolha sua especialização:"
+	sub.text = "Voce atingiu Lv.25! Escolha sua especializacao:"
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub.add_theme_font_size_override("font_size", 12)
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -72,17 +73,16 @@ func _build_ui() -> void:
 
 func _fetch_classes() -> void:
 	var char_id := str(GameState.character.get("id", ""))
-	ApiClient.get_req(
-		"/api/characters/%s/available-classes" % char_id,
-		func(code: int, data) -> void:
-			if code == 200 and data is Array and data.size() > 0:
-				_classes = data
-				_status_label.visible = false
-				_scroll.visible = true
-				_build_cards()
-			else:
-				_status_label.text = "Nenhuma classe disponível no momento."
-	)
+	ApiClient.get_req("/api/characters/%s/available-classes" % char_id, _on_classes_fetched)
+
+func _on_classes_fetched(code: int, data) -> void:
+	if code == 200 and data is Array and data.size() > 0:
+		_classes = data
+		_status_label.visible = false
+		_scroll.visible = true
+		_build_cards()
+	else:
+		_status_label.text = "Nenhuma classe disponivel no momento."
 
 func _build_cards() -> void:
 	for cls in _classes:
@@ -102,9 +102,9 @@ func _build_card(cls: Dictionary) -> void:
 	name_lbl.add_theme_font_size_override("font_size", 14)
 	inner.add_child(name_lbl)
 
-	var growth : Dictionary = cls.get("stat_growth", {})
+	var growth: Dictionary = cls.get("stat_growth", {})
 	if not growth.is_empty():
-		var parts : Array = []
+		var parts: Array = []
 		for stat in growth:
 			parts.append("%s +%d/Lv" % [stat.to_upper(), growth[stat]])
 		var growth_lbl := Label.new()
@@ -125,22 +125,21 @@ func _build_card(cls: Dictionary) -> void:
 	inner.add_child(btn)
 
 func _on_class_selected(class_id: String) -> void:
+	_pending_class = class_id
 	var char_id := str(GameState.character.get("id", ""))
-	ApiClient.post(
-		"/api/characters/%s/class-change" % char_id,
-		{"class_id": class_id},
-		func(code: int, data) -> void:
-			if code == 200 and data != null:
-				CharacterData.apply_from_response(data)
-				class_chosen.emit(class_id)
-				visible = false
-			else:
-				var err := Label.new()
-				err.text = "Erro ao mudar de classe. Tente novamente."
-				err.modulate = Color(1.0, 0.3, 0.3)
-				err.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				_cards_container.add_child(err)
-	)
+	ApiClient.post("/api/characters/%s/class-change" % char_id, {"class_id": class_id}, _on_class_change_response)
+
+func _on_class_change_response(code: int, data) -> void:
+	if code == 200 and data != null:
+		CharacterData.apply_from_response(data)
+		class_chosen.emit(_pending_class)
+		visible = false
+	else:
+		var err := Label.new()
+		err.text = "Erro ao mudar de classe. Tente novamente."
+		err.modulate = Color(1.0, 0.3, 0.3)
+		err.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_cards_container.add_child(err)
 
 func _on_dismiss() -> void:
 	visible = false

@@ -41,14 +41,8 @@ func _ready() -> void:
 	_class_panel = load("res://scripts/ui/class_change.gd").new()
 	add_child(_class_panel)
 	_class_panel.visible = false
-	_class_panel.class_chosen.connect(
-		func(_id: String) -> void:
-			show_notification("Classe escolhida! Bem-vindo, aventureiro!")
-	)
-	_class_panel.dismissed.connect(
-		func() -> void:
-			show_notification("Abra o painel de Atributos (C) para trocar de classe.", Color.WHITE)
-	)
+	_class_panel.class_chosen.connect(_on_class_panel_chosen)
+	_class_panel.dismissed.connect(_on_class_panel_dismissed)
 
 	_check_class_change_available()
 
@@ -113,6 +107,12 @@ func _on_level_changed(level: int) -> void:
 
 func _on_class_changed(_new_class_id: String) -> void:
 	_refresh_class_row()
+
+func _on_class_panel_chosen(_id: String) -> void:
+	show_notification("Classe escolhida! Bem-vindo, aventureiro!")
+
+func _on_class_panel_dismissed() -> void:
+	show_notification("Abra o painel de Atributos (C) para trocar de classe.", Color.WHITE)
 
 # ── Atalho de teclado ─────────────────────────────────────────────────────────
 

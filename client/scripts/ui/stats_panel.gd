@@ -1,12 +1,12 @@
 extends Control
 
-const _STAT_DEFS := [
-	["str",  "STR", "Força"],
-	["agi",  "AGI", "Agilidade"],
-	["vit",  "VIT", "Vitalidade"],
-	["int_", "INT", "Inteligência"],
-	["dex",  "DEX", "Destreza"],
-	["luk",  "LUK", "Sorte"],
+const _STAT_DEFS = [
+	["str",  "STR"],
+	["agi",  "AGI"],
+	["vit",  "VIT"],
+	["int_", "INT"],
+	["dex",  "DEX"],
+	["luk",  "LUK"],
 ]
 
 var _pending        : Dictionary = {}
@@ -73,7 +73,7 @@ func _build_ui() -> void:
 	var close_btn := Button.new()
 	close_btn.text = "Fechar"
 	close_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	close_btn.pressed.connect(func() -> void: visible = false)
+	close_btn.pressed.connect(_on_close_pressed)
 	btn_row.add_child(close_btn)
 
 func _build_stat_row(parent: Control, key: String, abbr: String) -> void:
@@ -129,12 +129,12 @@ func _refresh() -> void:
 	}
 	for key in base_vals:
 		_current_labels[key].text = str(base_vals[key] + _pending.get(key, 0))
-		var p : int = _pending.get(key, 0)
+		var p: int = _pending.get(key, 0)
 		_pending_labels[key].text = "+%d" % p
 
 	var used  := _total_pending()
 	var avail := CharacterData.stat_points - used
-	_avail_label.text = "Pontos disponíveis: %d" % avail
+	_avail_label.text = "Pontos disponiveis: %d" % avail
 	_apply_btn.disabled = used == 0
 
 func _total_pending() -> int:
@@ -155,6 +155,9 @@ func _on_minus(key: String) -> void:
 	_pending[key] -= 1
 	_refresh()
 
+func _on_close_pressed() -> void:
+	visible = false
+
 func _on_apply_pressed() -> void:
 	if _total_pending() == 0:
 		return
@@ -164,15 +167,13 @@ func _on_apply_pressed() -> void:
 		if _pending[key] > 0:
 			body[key] = _pending[key]
 	_apply_btn.disabled = true
-	ApiClient.post(
-		"/api/characters/%s/allocate-stats" % char_id,
-		body,
-		func(code: int, data) -> void:
-			if code == 200 and data != null:
-				CharacterData.apply_from_response(data)
-				for k in _pending:
-					_pending[k] = 0
-				_refresh()
-			else:
-				_apply_btn.disabled = false
-	)
+	ApiClient.post("/api/characters/%s/allocate-stats" % char_id, body, _on_allocate_response)
+
+func _on_allocate_response(code: int, data) -> void:
+	if code == 200 and data != null:
+		CharacterData.apply_from_response(data)
+		for k in _pending:
+			_pending[k] = 0
+		_refresh()
+	else:
+		_apply_btn.disabled = false
