@@ -331,7 +331,7 @@ func _select_item(item: Dictionary, cat: Dictionary) -> void:
 func _build_item_desc(item: Dictionary, cat: Dictionary) -> String:
 	var lines : Array = []
 
-	var qty := item.get("quantity", 1)
+	var qty : int = item.get("quantity", 1)
 	if qty > 1:
 		lines.append("Quantidade: %d" % qty)
 
