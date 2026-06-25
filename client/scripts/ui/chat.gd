@@ -46,6 +46,10 @@ func _on_send_pressed() -> void:
 		"payload": {"channel": _active_channel, "message": msg}
 	})
 
+	# Exibe a própria mensagem localmente (servidor não faz echo para o remetente em canal local/map)
+	var my_name : String = GameState.character.get("name", "Eu")
+	_add_line(_active_channel, "[%s] %s" % [my_name, msg])
+
 # ── Canal ─────────────────────────────────────────────────────────────────────
 
 func _on_tab_changed(tab: int) -> void:

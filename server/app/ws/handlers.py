@@ -11,7 +11,7 @@ from app.ws.connection_manager import ConnectionManager
 
 logger = structlog.get_logger()
 
-CHAT_CHANNELS = {"global", "local", "party", "guild", "whisper"}
+CHAT_CHANNELS = {"global", "local", "map", "party", "guild", "whisper"}
 
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
@@ -389,23 +389,36 @@ async def _handle_pickup(manager: ConnectionManager, character_id: uuid.UUID, pa
 
 async def _handle_chat(manager: ConnectionManager, character_id: uuid.UUID, payload: dict) -> None:
     from app.ws.broadcaster import broadcast_global
+    from app.redis_client import get_redis
 
     try:
         channel = str(payload["channel"])
-        content = str(payload["content"]).strip()
+        content = str(payload.get("message", payload.get("content", ""))).strip()
     except (KeyError, TypeError):
         return
 
     if channel not in CHAT_CHANNELS or not content or len(content) > 255:
         return
 
+    # Resolve nome do remetente via Redis
+    r = get_redis()
+    char_raw = await r.hgetall(f"char_stats:{character_id}")
+    sender_name = char_raw.get("name", "?")
+
+    # "map" é alias de "local"
+    effective_channel = "local" if channel == "map" else channel
+
     message = {
-        "type": "CHAT_MESSAGE",
-        "payload": {"character_id": str(character_id), "channel": channel, "content": content},
+        "type": "CHAT",
+        "payload": {
+            "channel": channel,
+            "sender_name": sender_name,
+            "message": content,
+        },
         "timestamp": _now(),
     }
 
-    match channel:
+    match effective_channel:
         case "global":
             await broadcast_global(manager, message)
         case "local":
@@ -510,6 +523,7 @@ async def _cache_char_stats(character) -> None:
     from app.redis_client import get_redis
     r = get_redis()
     await r.hset(f"char_stats:{character.id}", mapping={
+        "name": character.name,
         "level": str(character.level),
         "xp": str(character.xp),
         "xp_to_next": str(character.xp_to_next),
