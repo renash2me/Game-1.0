@@ -153,6 +153,33 @@ async def get_available_classes(
     return available
 
 
+@router.get("/{character_id}/skills")
+async def list_character_skills(
+    character_id: uuid.UUID,
+    player: Player = Depends(get_current_player),
+    session: AsyncSession = Depends(get_session),
+):
+    result = await session.execute(
+        select(Character).where(
+            Character.id == character_id,
+            Character.player_id == player.id,
+        )
+    )
+    character = result.scalar_one_or_none()
+    if not character:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Personagem não encontrado")
+
+    catalog = loader.get_skills()
+    skills_data = character.skills_data or {}
+
+    available = []
+    for skill_id, skill in catalog.items():
+        required_class = skill.get("class_required")
+        if required_class is None or required_class == character.class_id:
+            available.append({**skill, "current_level": skills_data.get(skill_id, 0)})
+    return available
+
+
 @router.get("/{character_id}", response_model=CharacterResponse)
 async def get_character(
     character_id: uuid.UUID,

@@ -14,6 +14,8 @@ extends CanvasLayer
 
 var _stats_panel
 var _class_panel
+var _skills_panel
+var _equip_panel
 
 # ── Drag / Resize do HUD ──────────────────────────────────────────────────────
 var _hud_dragging      : bool    = false
@@ -51,6 +53,14 @@ func _ready() -> void:
 	_class_panel.visible = false
 	_class_panel.class_chosen.connect(_on_class_panel_chosen)
 	_class_panel.dismissed.connect(_on_class_panel_dismissed)
+
+	_skills_panel = load("res://scripts/ui/skills_panel.gd").new()
+	add_child(_skills_panel)
+	_skills_panel.visible = false
+
+	_equip_panel = load("res://scripts/ui/equipment_panel.gd").new()
+	add_child(_equip_panel)
+	_equip_panel.visible = false
 
 	_check_class_change_available()
 	_setup_hud_drag()
@@ -124,13 +134,30 @@ func _on_class_panel_chosen(_id: String) -> void:
 func _on_class_panel_dismissed() -> void:
 	show_notification("Abra o painel de Atributos (C) para trocar de classe.", Color.WHITE)
 
+# ── Painéis de Skills e Equipamentos ─────────────────────────────────────────
+
+func _on_skills_btn_pressed() -> void:
+	if _class_panel.visible:
+		return
+	_skills_panel.visible = !_skills_panel.visible
+
+func _on_equip_btn_pressed() -> void:
+	_equip_panel.visible = !_equip_panel.visible
+
 # ── Atalho de teclado ─────────────────────────────────────────────────────────
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_C:
-			_on_stats_btn_pressed()
-			get_viewport().set_input_as_handled()
+		match event.keycode:
+			KEY_C:
+				_on_stats_btn_pressed()
+				get_viewport().set_input_as_handled()
+			KEY_K:
+				_on_skills_btn_pressed()
+				get_viewport().set_input_as_handled()
+			KEY_E:
+				_on_equip_btn_pressed()
+				get_viewport().set_input_as_handled()
 
 # ── Drag / Resize ─────────────────────────────────────────────────────────────
 
@@ -149,6 +176,25 @@ func _setup_hud_drag() -> void:
 	handle.gui_input.connect(_on_hud_handle_input)
 	$Panel/VBox.add_child(handle)
 	$Panel/VBox.move_child(handle, 0)
+
+	# Botões Skills e Equip
+	var extra_row := HBoxContainer.new()
+	extra_row.add_theme_constant_override("separation", 4)
+	$Panel/VBox.add_child(extra_row)
+
+	var skills_btn := Button.new()
+	skills_btn.text = "Skills (K)"
+	skills_btn.add_theme_font_size_override("font_size", 10)
+	skills_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	skills_btn.pressed.connect(_on_skills_btn_pressed)
+	extra_row.add_child(skills_btn)
+
+	var equip_btn := Button.new()
+	equip_btn.text = "Equip (E)"
+	equip_btn.add_theme_font_size_override("font_size", 10)
+	equip_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	equip_btn.pressed.connect(_on_equip_btn_pressed)
+	extra_row.add_child(equip_btn)
 
 	# Grip de resize no canto inferior direito (filho direto do CanvasLayer)
 	_hud_grip = ColorRect.new()
