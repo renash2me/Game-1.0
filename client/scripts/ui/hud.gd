@@ -15,6 +15,14 @@ extends CanvasLayer
 var _stats_panel
 var _class_panel
 
+# ── Drag / Resize do HUD ──────────────────────────────────────────────────────
+var _hud_dragging      : bool    = false
+var _hud_drag_offset   : Vector2 = Vector2.ZERO
+var _hud_resizing      : bool    = false
+var _hud_resize_origin : Vector2 = Vector2.ZERO
+var _hud_resize_base   : float   = 1.0
+var _hud_grip                    # ColorRect — não tipado para evitar problemas 4.7
+
 func _ready() -> void:
 	CharacterData.hp_changed.connect(_refresh_hp)
 	CharacterData.sp_changed.connect(_refresh_sp)
@@ -45,6 +53,7 @@ func _ready() -> void:
 	_class_panel.dismissed.connect(_on_class_panel_dismissed)
 
 	_check_class_change_available()
+	_setup_hud_drag()
 
 # ── Refreshes ─────────────────────────────────────────────────────────────────
 
@@ -122,3 +131,70 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_C:
 			_on_stats_btn_pressed()
 			get_viewport().set_input_as_handled()
+
+# ── Drag / Resize ─────────────────────────────────────────────────────────────
+
+func _setup_hud_drag() -> void:
+	var panel := $Panel
+	panel.set_anchors_preset(Control.PRESET_TOP_LEFT, true)
+
+	# Barra de arraste no topo do VBox
+	var handle := Label.new()
+	handle.text = ":: HUD"
+	handle.add_theme_font_size_override("font_size", 10)
+	handle.modulate = Color(0.6, 0.6, 0.6)
+	handle.mouse_filter = Control.MOUSE_FILTER_STOP
+	handle.mouse_default_cursor_shape = Control.CURSOR_MOVE
+	handle.custom_minimum_size = Vector2(0, 14)
+	handle.gui_input.connect(_on_hud_handle_input)
+	$Panel/VBox.add_child(handle)
+	$Panel/VBox.move_child(handle, 0)
+
+	# Grip de resize no canto inferior direito (filho direto do CanvasLayer)
+	_hud_grip = ColorRect.new()
+	_hud_grip.color = Color(0.55, 0.55, 0.55, 0.5)
+	_hud_grip.size = Vector2(10, 10)
+	_hud_grip.mouse_filter = Control.MOUSE_FILTER_STOP
+	_hud_grip.mouse_default_cursor_shape = Control.CURSOR_FDIAGSIZE
+	_hud_grip.gui_input.connect(_on_hud_grip_input)
+	add_child(_hud_grip)
+	call_deferred("_update_hud_grip")
+
+func _update_hud_grip() -> void:
+	if _hud_grip == null:
+		return
+	var panel := $Panel
+	var vsize : Vector2 = panel.size * panel.scale
+	_hud_grip.position = panel.position + vsize - Vector2(10, 10)
+
+func _hud_mouse() -> Vector2:
+	return get_viewport().get_mouse_position()
+
+func _on_hud_handle_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_hud_dragging = event.pressed
+		if event.pressed:
+			_hud_drag_offset = $Panel.position - _hud_mouse()
+
+func _on_hud_grip_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_hud_resizing = event.pressed
+		if event.pressed:
+			_hud_resize_origin = _hud_mouse()
+			_hud_resize_base   = $Panel.scale.x
+
+func _input(event: InputEvent) -> void:
+	if _hud_dragging:
+		if event is InputEventMouseMotion:
+			$Panel.position = _hud_mouse() + _hud_drag_offset
+			_update_hud_grip()
+		elif event is InputEventMouseButton and not event.pressed:
+			_hud_dragging = false
+	if _hud_resizing:
+		if event is InputEventMouseMotion:
+			var dx : float = (_hud_mouse().x - _hud_resize_origin.x) * 0.006
+			var ns : float = clamp(_hud_resize_base + dx, 0.5, 2.5)
+			$Panel.scale = Vector2(ns, ns)
+			_update_hud_grip()
+		elif event is InputEventMouseButton and not event.pressed:
+			_hud_resizing = false

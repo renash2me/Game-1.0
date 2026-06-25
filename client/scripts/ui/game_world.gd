@@ -19,9 +19,10 @@ var _drops   : Dictionary = {}   # drop_id → drop node
 const MOVE_SPEED : float = 120.0
 const SEND_INTERVAL : float = 0.1
 var _move_target : Vector2 = Vector2.ZERO
-var _moving : bool = false
-var _send_timer : float = 0.0
-var _last_sent  : Vector2 = Vector2.ZERO
+var _moving      : bool    = false
+var _left_held   : bool    = false
+var _send_timer  : float   = 0.0
+var _last_sent   : Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	_local_name = str(GameState.character.get("name", ""))
@@ -66,20 +67,51 @@ func _add_ground() -> void:
 # ── Input ─────────────────────────────────────────────────────────────────────
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed:
+	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			if _inv_ui.visible:
-				return
-			var target := get_global_mouse_position()
-			if Input.is_action_pressed("attack"):
-				_try_attack_at(target)
+			if event.pressed:
+				if _inv_ui.visible:
+					return
+				_left_held = true
+				var target := get_global_mouse_position()
+				if Input.is_action_pressed("attack"):
+					_try_attack_at(target)
+				else:
+					_move_target = target
+					_moving = true
+					_spawn_click_marker(target)
 			else:
-				_move_target = target
-				_moving = true
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
+				_left_held = false
+		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			_try_pickup_at(get_global_mouse_position())
+	elif event is InputEventMouseMotion and _left_held:
+		if not _inv_ui.visible and not Input.is_action_pressed("attack"):
+			_move_target = get_global_mouse_position()
+			_moving = true
 	elif event.is_action_pressed("inventory"):
 		_inv_ui.visible = !_inv_ui.visible
+
+func _spawn_click_marker(world_pos: Vector2) -> void:
+	var marker := Node2D.new()
+	add_child(marker)
+	marker.position = world_pos
+
+	var outer := ColorRect.new()
+	outer.size = Vector2(18, 18)
+	outer.position = Vector2(-9, -9)
+	outer.color = Color(1.0, 1.0, 1.0, 0.75)
+	marker.add_child(outer)
+
+	var inner := ColorRect.new()
+	inner.size = Vector2(6, 6)
+	inner.position = Vector2(-3, -3)
+	inner.color = Color(1.0, 0.9, 0.3, 1.0)
+	marker.add_child(inner)
+
+	var tw := create_tween()
+	tw.tween_property(marker, "scale", Vector2(1.8, 1.8), 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(outer, "modulate:a", 0.0, 0.22)
+	tw.tween_callback(marker.queue_free)
 
 # ── Process loop ──────────────────────────────────────────────────────────────
 
