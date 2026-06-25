@@ -13,24 +13,21 @@ func _ready() -> void:
 	GameState.clear()
 
 func _add_background() -> void:
-	# Simula gradiente com 4 faixas de cor
-	var colors : Array = [
-		Color(0.03, 0.05, 0.20),
-		Color(0.04, 0.05, 0.17),
-		Color(0.06, 0.04, 0.15),
-		Color(0.08, 0.03, 0.13),
-	]
-	for i in range(colors.size()):
-		var seg := ColorRect.new()
-		seg.color = colors[i]
-		seg.set_anchors_preset(Control.PRESET_FULL_RECT)
-		seg.anchor_top    = i * 0.25
-		seg.anchor_bottom = (i + 1) * 0.25
-		seg.offset_top    = 0
-		seg.offset_bottom = 0
-		seg.mouse_filter  = Control.MOUSE_FILTER_IGNORE
-		add_child(seg)
-		move_child(seg, i)
+	var bg := TextureRect.new()
+	bg.texture = load("res://assets/sprites/login_bg.png")
+	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(bg)
+	move_child(bg, 0)
+
+	# Overlay escuro para os paineis ficarem legiveis
+	var overlay := ColorRect.new()
+	overlay.color = Color(0.0, 0.0, 0.0, 0.45)
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(overlay)
+	move_child(overlay, 1)
 
 # ── Login ─────────────────────────────────────────────────────────────────────
 
