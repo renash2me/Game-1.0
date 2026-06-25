@@ -34,10 +34,15 @@ async def start_websocket() -> None:
     await start_ws_server()
 
 
+async def start_checkpoint() -> None:
+    from app.systems.checkpoint import periodic_checkpoint
+    await periodic_checkpoint()
+
+
 async def main() -> None:
     logger.info("aethermoor_starting", api_port=settings.game_api_port, ws_port=settings.game_ws_port)
     run_migrations()
-    await asyncio.gather(start_api(), start_websocket())
+    await asyncio.gather(start_api(), start_websocket(), start_checkpoint())
 
 
 if __name__ == "__main__":
