@@ -102,7 +102,7 @@ func _try_attack_at(pos: Vector2) -> void:
 	var best_dist := 80.0  # alcance máximo em pixels
 	for instance_id in _mobs:
 		var mob_node = _mobs[instance_id]
-		var d := mob_node.position.distance_to(pos)
+		var d: float = mob_node.position.distance_to(pos)
 		if d < best_dist:
 			best_dist = d
 			best_id = instance_id
@@ -116,8 +116,9 @@ func _try_pickup_at(pos: Vector2) -> void:
 	var best_dist := 60.0
 	for drop_id in _drops:
 		var dn = _drops[drop_id]
-		if dn.position.distance_to(pos) < best_dist:
-			best_dist = dn.position.distance_to(pos)
+		var dn_dist: float = dn.position.distance_to(pos)
+		if dn_dist < best_dist:
+			best_dist = dn_dist
 			best_id = drop_id
 	if best_id != "":
 		WsClient.send({"type": "PICKUP", "payload": {"drop_id": best_id}})
