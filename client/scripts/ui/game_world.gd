@@ -9,6 +9,7 @@ extends Node2D
 @onready var _chat_ui      : Control   = $HUD/Chat
 @onready var _inv_ui       : Control   = $HUD/Inventory
 var _local_name : String = ""
+var _coords_lbl          # Label de coordenadas no HUD
 
 # ── Entidades no mapa ─────────────────────────────────────────────────────────
 var _players : Dictionary = {}   # char_id → Sprite2D
@@ -29,9 +30,16 @@ func _ready() -> void:
 	CharacterData.apply_from_response(GameState.character)
 	_add_ground()
 
-	# Inventário e chat começam escondidos
+	# Inventário começa escondido; chat fica visível
 	_inv_ui.visible = false
-	_chat_ui.visible = false
+
+	# Label de coordenadas no canto inferior esquerdo
+	_coords_lbl = Label.new()
+	_coords_lbl.add_theme_font_size_override("font_size", 11)
+	_coords_lbl.modulate = Color(1.0, 1.0, 0.5, 0.85)
+	_coords_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hud.add_child(_coords_lbl)
+	call_deferred("_anchor_coords_lbl")
 
 	var px : float = GameState.character.get("pos_x", 0.0)
 	var py : float = GameState.character.get("pos_y", 0.0)
@@ -44,6 +52,12 @@ func _ready() -> void:
 
 	var map_id : String = GameState.character.get("current_map", "starter_village")
 	MapManager.load_map(map_id)
+
+func _anchor_coords_lbl() -> void:
+	if _coords_lbl == null:
+		return
+	var vp_size := get_viewport().get_visible_rect().size
+	_coords_lbl.position = Vector2(8.0, vp_size.y - 24.0)
 
 func _add_ground() -> void:
 	var layer := CanvasLayer.new()
@@ -120,6 +134,14 @@ func _spawn_click_marker(world_pos: Vector2) -> void:
 # ── Process loop ──────────────────────────────────────────────────────────────
 
 func _process(delta: float) -> void:
+	# Atualiza coordenadas na tela
+	if _coords_lbl != null:
+		var pnode = _get_local_player_node()
+		if pnode != null:
+			_coords_lbl.text = "X: %.0f  Y: %.0f" % [pnode.position.x, pnode.position.y]
+		else:
+			_coords_lbl.text = "X: --  Y: --"
+
 	if not _moving:
 		return
 
