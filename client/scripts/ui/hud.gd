@@ -61,7 +61,8 @@ func _refresh_sp(sp: int, max_sp: int) -> void:
 func _refresh_xp(xp: int, xp_next: int) -> void:
 	_xp_bar.max_value = max(xp_next, 1)
 	_xp_bar.value = xp
-	_xp_lbl.text = "%d / %d xp" % [xp, xp_next]
+	var pct := int(float(xp) / float(max(xp_next, 1)) * 100.0)
+	_xp_lbl.text = "%d%%" % pct
 
 func _refresh_level(level: int) -> void:
 	_level_lbl.text = "Lv. %d" % level
