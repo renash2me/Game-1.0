@@ -4,7 +4,7 @@ const SNAP_DIST := 16.0
 const SIZE_SNAP := 8.0
 const MIN_TITLE := 26.0
 
-static var _panels : Array = []
+static var _panels : Array[PanelContainer] = []
 
 static func register(panel: PanelContainer) -> void:
 	if panel not in _panels:
@@ -51,7 +51,7 @@ static func _s(val: float, target: float, dist: float) -> float:
 	return target if absf(val - target) < dist else val
 
 static func _clean() -> void:
-	var valid : Array = []
+	var valid : Array[PanelContainer] = []
 	for p in _panels:
 		if is_instance_valid(p):
 			valid.append(p)
