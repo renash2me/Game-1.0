@@ -1,3 +1,4 @@
+extends RefCounted
 class_name WindowManager
 
 # Snap/clamp centralizado para todos os painéis flutuantes.
