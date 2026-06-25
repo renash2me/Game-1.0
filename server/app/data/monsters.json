@@ -17,6 +17,7 @@
     "size": "small",
     "element": "water",
     "race": "plant",
+    "tags": [],
     "drops": [
       {"item_id": "jellopy",       "chance": 0.7000},
       {"item_id": "sticky_mucus",  "chance": 0.1500},
@@ -42,6 +43,7 @@
     "size": "small",
     "element": "earth",
     "race": "insect",
+    "tags": [],
     "drops": [
       {"item_id": "fluff",      "chance": 0.6000},
       {"item_id": "chrysalis",  "chance": 0.0500},

@@ -107,7 +107,7 @@ func _try_attack_at(pos: Vector2) -> void:
 			best_dist = d
 			best_id = instance_id
 	if best_id != "":
-		WsClient.send({"type": "ATTACK", "payload": {"target_id": best_id}})
+		WsClient.send({"type": "ATTACK", "payload": {"target_id": best_id, "attack_type": "melee"}})
 
 # ── Pickup ────────────────────────────────────────────────────────────────────
 
@@ -215,13 +215,13 @@ func _handle_damage(payload: Dictionary) -> void:
 
 func _handle_level_up(payload: Dictionary) -> void:
 	CharacterData.apply_level_up(
-		payload.get("level", CharacterData.level),
-		payload.get("stat_points", 0),
-		payload.get("skill_points", 0)
+		payload.get("new_level", CharacterData.level),
+		payload.get("stat_points_gained", 0),
+		payload.get("skill_points_gained", 0)
 	)
 	CharacterData.apply_xp(
-		payload.get("xp", 0),
-		payload.get("xp_to_next", 1)
+		payload.get("xp", CharacterData.xp),
+		payload.get("xp_to_next", CharacterData.xp_to_next)
 	)
 
 func _handle_map_change(payload: Dictionary) -> void:

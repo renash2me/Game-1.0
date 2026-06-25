@@ -5,6 +5,7 @@
     "width": 800,
     "height": 600,
     "is_safe": true,
+    "tags": [],
     "music": "village_theme",
     "spawn_points": [],
     "portals": [
@@ -25,6 +26,7 @@
     "width": 1200,
     "height": 900,
     "is_safe": false,
+    "tags": [],
     "music": "field_theme",
     "spawn_points": [
       {

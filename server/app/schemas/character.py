@@ -26,6 +26,38 @@ class CharacterCreate(BaseModel):
         return v
 
 
+class ClassChangeRequest(BaseModel):
+    class_id: str
+
+
+class AllocateStatsRequest(BaseModel):
+    str: int = 0
+    agi: int = 0
+    vit: int = 0
+    int_: int = 0
+    dex: int = 0
+    luk: int = 0
+
+    @field_validator("str", "agi", "vit", "int_", "dex", "luk", mode="before")
+    @classmethod
+    def non_negative(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("Pontos de atributo não podem ser negativos")
+        return v
+
+
+class AllocateSkillRequest(BaseModel):
+    skill_id: str
+    levels: int = 1
+
+    @field_validator("levels")
+    @classmethod
+    def at_least_one(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("levels deve ser >= 1")
+        return v
+
+
 class CharacterResponse(BaseModel):
     id: uuid.UUID
     player_id: uuid.UUID
@@ -53,6 +85,7 @@ class CharacterResponse(BaseModel):
     pos_x: float
     pos_y: float
     zeny: int
+    skills_data: dict
     created_at: datetime
 
     model_config = {"from_attributes": True}

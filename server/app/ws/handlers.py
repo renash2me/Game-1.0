@@ -200,6 +200,8 @@ async def _handle_attack(manager: ConnectionManager, character_id: uuid.UUID, pa
     if not instance_id:
         return
 
+    attack_type = str(payload.get("attack_type", "melee"))
+
     r = get_redis()
     mob_raw = await r.hgetall(f"mob:{instance_id}")
     if not mob_raw or mob_raw.get("state") == "dead":
@@ -248,7 +250,7 @@ async def _handle_attack(manager: ConnectionManager, character_id: uuid.UUID, pa
 
     if new_hp <= 0:
         await _handle_mob_death(
-            manager, r, character_id, instance_id, mob_id, mob_data, map_id, char_raw
+            manager, r, character_id, instance_id, mob_id, mob_data, map_id, char_raw, attack_type
         )
     else:
         await r.hset(f"mob:{instance_id}", "hp", str(new_hp))
@@ -263,6 +265,7 @@ async def _handle_mob_death(
     mob_data: dict,
     map_id: str,
     char_raw: dict,
+    attack_type: str = "melee",
 ) -> None:
     from app.systems.drop_system import roll_drops
     from app.systems.mob_spawn import respawn_mob_later, save_drops_to_redis
@@ -325,8 +328,8 @@ async def _handle_mob_death(
     damage = int(char_raw.get("damage_dealt_session", 0))
     asyncio.ensure_future(_update_quests_on_kill(killer_id, mob_id, map_id, manager))
 
-    # Aptidão do Novice — atualiza de forma assíncrona para não bloquear
-    asyncio.ensure_future(_update_aptitude_on_kill(killer_id, damage))
+    # Aptidão — atualiza de forma assíncrona para não bloquear
+    asyncio.ensure_future(_update_aptitude_on_kill(killer_id, damage, mob_data, attack_type))
 
     # Respawn
     maps = get_maps()
@@ -458,17 +461,21 @@ async def _update_quests_on_map(
         logger.error("quest_map_update_error", error=str(e))
 
 
-async def _update_aptitude_on_kill(character_id: uuid.UUID, damage: int) -> None:
+async def _update_aptitude_on_kill(
+    character_id: uuid.UUID, damage: int, mob_data: dict, attack_type: str
+) -> None:
     from app.database import async_session_factory
     from app.models.character import Character
-    from app.systems.aptitude import record_kill, record_damage_dealt
+    from app.systems.aptitude import apply_kill_aptitude
     from sqlalchemy import select
     try:
         async with async_session_factory() as session:
             result = await session.execute(select(Character).where(Character.id == character_id))
             char = result.scalar_one_or_none()
-            if char and char.class_id == "novice":
-                char.aptitude_data = record_damage_dealt(record_kill(char.aptitude_data or {}), damage)
+            if char and char.class_tier < 4:
+                char.aptitude_data = apply_kill_aptitude(
+                    char.aptitude_data or {}, mob_data, attack_type, damage
+                )
                 await session.commit()
     except Exception as e:
         logger.error("aptitude_update_error", error=str(e))
@@ -477,14 +484,19 @@ async def _update_aptitude_on_kill(character_id: uuid.UUID, damage: int) -> None
 async def _update_aptitude_on_map(character_id: uuid.UUID, map_id: str) -> None:
     from app.database import async_session_factory
     from app.models.character import Character
-    from app.systems.aptitude import record_map_visit
+    from app.data.loader import get_maps
+    from app.systems.aptitude import record_map_visit, record_void_map
     from sqlalchemy import select
     try:
         async with async_session_factory() as session:
             result = await session.execute(select(Character).where(Character.id == character_id))
             char = result.scalar_one_or_none()
-            if char and char.class_id == "novice":
-                char.aptitude_data = record_map_visit(char.aptitude_data or {}, map_id)
+            if char and char.class_tier < 4:
+                apt = record_map_visit(char.aptitude_data or {}, map_id)
+                map_data = get_maps().get(map_id, {})
+                if "void" in map_data.get("tags", []):
+                    apt = record_void_map(apt)
+                char.aptitude_data = apt
                 await session.commit()
     except Exception as e:
         logger.error("aptitude_map_error", error=str(e))

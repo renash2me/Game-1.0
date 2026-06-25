@@ -46,6 +46,7 @@ class Character(Base):
     pos_y: Mapped[float] = mapped_column(Float, default=0.0)
     zeny: Mapped[int] = mapped_column(BigInteger, default=0)
     aptitude_data: Mapped[dict] = mapped_column(JSONB, default=dict)
+    skills_data: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     player: Mapped["Player"] = relationship("Player", back_populates="characters")
