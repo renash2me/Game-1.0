@@ -63,3 +63,9 @@ app.mount("/admin", StaticFiles(directory="/app/admin", html=True), name="admin"
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "service": "aethermoor-api"}
+
+
+@app.get("/api/items")
+async def list_items():
+    from app.data.loader import get_items
+    return list(get_items().values())
