@@ -52,9 +52,35 @@ async def _on_map_join(character_id: uuid.UUID) -> None:
 async def _on_map_leave(character_id: uuid.UUID) -> None:
     from app.redis_client import get_redis
     map_id = manager.get_map(character_id)
+    r = get_redis()
     if map_id:
-        r = get_redis()
         await r.srem(f"online_players:{map_id}", str(character_id))
+    # Persiste posição final no DB para sobreviver a reinícios
+    pos = await r.hgetall(f"pos:{character_id}")
+    if pos and pos.get("x"):
+        await _persist_position_to_db(character_id, pos)
+
+
+async def _persist_position_to_db(character_id: uuid.UUID, pos: dict) -> None:
+    from app.database import async_session_factory
+    from app.models.character import Character
+    from sqlalchemy import update
+    try:
+        async with async_session_factory() as session:
+            await session.execute(
+                update(Character)
+                .where(Character.id == character_id)
+                .values(
+                    pos_x=float(pos.get("x", 0.0)),
+                    pos_y=float(pos.get("y", 0.0)),
+                    current_map=str(pos.get("map_id", "starter_village")),
+                )
+            )
+            await session.commit()
+        logger.info("position_persisted", character_id=str(character_id),
+                    x=pos.get("x"), y=pos.get("y"), map_id=pos.get("map_id"))
+    except Exception:
+        logger.exception("persist_position_failed", character_id=str(character_id))
 
 
 async def _dispatch(character_id: uuid.UUID, raw: str) -> None:

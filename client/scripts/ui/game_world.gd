@@ -146,7 +146,11 @@ func _process(delta: float) -> void:
 func _broadcast_move(pos: Vector2) -> void:
 	WsClient.send({
 		"type": "MOVE",
-		"payload": {"x": pos.x, "y": pos.y}
+		"payload": {
+			"x": pos.x,
+			"y": pos.y,
+			"map_id": GameState.character.get("current_map", "starter_village")
+		}
 	})
 
 # ── Ataque ────────────────────────────────────────────────────────────────────

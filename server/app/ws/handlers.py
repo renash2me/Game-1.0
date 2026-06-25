@@ -157,9 +157,10 @@ async def _handle_move(manager: ConnectionManager, character_id: uuid.UUID, payl
     try:
         x = float(payload["x"])
         y = float(payload["y"])
-        map_id = str(payload["map_id"])
     except (KeyError, ValueError, TypeError):
         return
+    # map_id é opcional: usa o do payload ou o mapa atual conhecido pelo servidor
+    map_id = str(payload.get("map_id") or manager.get_map(character_id) or "starter_village")
 
     from app.redis_client import get_redis
     r = get_redis()
