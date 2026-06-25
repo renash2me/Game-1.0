@@ -14,12 +14,13 @@ func _ready() -> void:
 # ── Carrega personagens ───────────────────────────────────────────────────────
 
 func _load_characters() -> void:
-	ApiClient.get_req("/api/characters", func(code: int, data):
-		if code != 200 or data == null:
-			return
-		_characters = data
-		_render_slots()
-	)
+	ApiClient.get_req("/api/characters", _on_characters_loaded)
+
+func _on_characters_loaded(code: int, data) -> void:
+	if code != 200 or data == null:
+		return
+	_characters = data
+	_render_slots()
 
 func _render_slots() -> void:
 	for child in _slots_grid.get_children():
@@ -86,17 +87,17 @@ func _on_confirm_create_pressed() -> void:
 		_create_error.text = "Nome deve ter ao menos 3 caracteres."
 		return
 
-	ApiClient.post("/api/characters", {"name": name_text, "class_id": "novice"},
-		func(code: int, data):
-			if code == 201:
-				_create_panel.visible = false
-				_load_characters()
-			else:
-				var msg := "Erro ao criar personagem."
-				if data != null and data.has("detail"):
-					msg = str(data["detail"])
-				_create_error.text = msg
-	)
+	ApiClient.post("/api/characters", {"name": name_text, "class_id": "novice"}, _on_create_response)
+
+func _on_create_response(code: int, data) -> void:
+	if code == 201:
+		_create_panel.visible = false
+		_load_characters()
+	else:
+		var msg: String = "Erro ao criar personagem."
+		if data != null and data.has("detail"):
+			msg = str(data["detail"])
+		_create_error.text = msg
 
 func _on_cancel_create_pressed() -> void:
 	_create_panel.visible = false

@@ -101,7 +101,7 @@ func _try_attack_at(pos: Vector2) -> void:
 	var best_id := ""
 	var best_dist := 80.0  # alcance máximo em pixels
 	for instance_id in _mobs:
-		var mob_node := _mobs[instance_id]
+		var mob_node = _mobs[instance_id]
 		var d := mob_node.position.distance_to(pos)
 		if d < best_dist:
 			best_dist = d
@@ -115,7 +115,7 @@ func _try_pickup_at(pos: Vector2) -> void:
 	var best_id := ""
 	var best_dist := 60.0
 	for drop_id in _drops:
-		var dn := _drops[drop_id]
+		var dn = _drops[drop_id]
 		if dn.position.distance_to(pos) < best_dist:
 			best_dist = dn.position.distance_to(pos)
 			best_id = drop_id

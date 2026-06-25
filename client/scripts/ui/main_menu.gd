@@ -21,17 +21,17 @@ func _on_login_pressed() -> void:
 		return
 	_login_err.text = "Conectando..."
 
-	ApiClient.post("/api/auth/login", {"username": username, "password": password},
-		func(code: int, data):
-			if code == 200 and data != null:
-				GameState.token = data.get("access_token", "")
-				get_tree().change_scene_to_file("res://scenes/character_select.tscn")
-			else:
-				var msg: String = "Erro ao fazer login."
-				if data != null and data.has("detail"):
-					msg = str(data["detail"])
-				_login_err.text = msg
-	)
+	ApiClient.post("/api/auth/login", {"username": username, "password": password}, _on_login_response)
+
+func _on_login_response(code: int, data) -> void:
+	if code == 200 and data != null:
+		GameState.token = data.get("access_token", "")
+		get_tree().change_scene_to_file("res://scenes/character_select.tscn")
+	else:
+		var msg: String = "Erro ao fazer login."
+		if data != null and data.has("detail"):
+			msg = str(data["detail"])
+		_login_err.text = msg
 
 # ── Registro ──────────────────────────────────────────────────────────────────
 
@@ -43,16 +43,16 @@ func _on_register_pressed() -> void:
 		_reg_err.text = "Preencha todos os campos."
 		return
 	_reg_err.text = "Criando conta..."
-
 	ApiClient.post("/api/auth/register",
 		{"username": username, "email": email, "password": password},
-		func(code: int, data):
-			if code == 201 and data != null:
-				GameState.token = data.get("access_token", "")
-				get_tree().change_scene_to_file("res://scenes/character_select.tscn")
-			else:
-				var msg: String = "Erro ao criar conta."
-				if data != null and data.has("detail"):
-					msg = str(data["detail"])
-				_reg_err.text = msg
-	)
+		_on_register_response)
+
+func _on_register_response(code: int, data) -> void:
+	if code == 201 and data != null:
+		GameState.token = data.get("access_token", "")
+		get_tree().change_scene_to_file("res://scenes/character_select.tscn")
+	else:
+		var msg: String = "Erro ao criar conta."
+		if data != null and data.has("detail"):
+			msg = str(data["detail"])
+		_reg_err.text = msg
