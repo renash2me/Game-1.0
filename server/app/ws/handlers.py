@@ -161,6 +161,7 @@ async def _handle_move(manager: ConnectionManager, character_id: uuid.UUID, payl
         return
     # map_id é opcional: usa o do payload ou o mapa atual conhecido pelo servidor
     map_id = str(payload.get("map_id") or manager.get_map(character_id) or "starter_village")
+    logger.debug("move_received", character_id=str(character_id), x=x, y=y, map_id=map_id)
 
     from app.redis_client import get_redis
     r = get_redis()

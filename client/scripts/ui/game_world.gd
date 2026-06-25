@@ -29,6 +29,10 @@ func _ready() -> void:
 	CharacterData.apply_from_response(GameState.character)
 	_add_ground()
 
+	# Inventário e chat começam escondidos
+	_inv_ui.visible = false
+	_chat_ui.visible = false
+
 	var px : float = GameState.character.get("pos_x", 0.0)
 	var py : float = GameState.character.get("pos_y", 0.0)
 	_move_target = Vector2(px, py)
