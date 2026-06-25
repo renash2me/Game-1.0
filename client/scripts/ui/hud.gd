@@ -12,8 +12,8 @@ extends CanvasLayer
 @onready var _stat_badge : Label       = $Panel/VBox/ClassRow/StatBadge
 @onready var _notif_lbl  : Label       = $Notification
 
-var _stats_panel : Control
-var _class_panel : Control
+var _stats_panel
+var _class_panel
 
 func _ready() -> void:
 	CharacterData.hp_changed.connect(_refresh_hp)
@@ -92,8 +92,8 @@ func _on_stats_btn_pressed() -> void:
 	if _class_panel.visible:
 		return
 	_stats_panel.visible = !_stats_panel.visible
-	if _stats_panel.visible and _stats_panel.has_method("_refresh"):
-		_stats_panel._refresh()
+	if _stats_panel.visible:
+		_stats_panel.call("_refresh")
 
 # ── Troca de classe ────────────────────────────────────────────────────────────
 
