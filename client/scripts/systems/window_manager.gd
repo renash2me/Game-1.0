@@ -9,7 +9,7 @@ const SNAP_DIST : float = 16.0
 const SIZE_SNAP : float = 8.0
 const MIN_TITLE : float = 26.0
 
-const _META_KEY := "_wm_panels"
+const _META_KEY : String = "_wm_panels"
 
 # ── Registro ──────────────────────────────────────────────────────────────────
 
