@@ -1,23 +1,99 @@
 [
-  {"id": "jellopy",       "name": "Jellopy",           "type": "material",  "stackable": true,  "weight": 1,   "sell_price": 3},
-  {"id": "sticky_mucus",  "name": "Muco Grudento",     "type": "material",  "stackable": true,  "weight": 1,   "sell_price": 10},
-  {"id": "fluff",         "name": "Fluff",             "type": "material",  "stackable": true,  "weight": 1,   "sell_price": 3},
-  {"id": "chrysalis",     "name": "Crisalida",         "type": "material",  "stackable": true,  "weight": 1,   "sell_price": 10},
-  {"id": "zeny_pouch_sm", "name": "Bolsinha de Zeny",  "type": "zeny_bag",  "stackable": false, "weight": 1,   "zeny_amount": 15},
-  {"id": "red_potion",    "name": "Pocao Vermelha",    "type": "consumable","stackable": true,  "weight": 70,  "buy_price": 50,  "sell_price": 25,  "effect": {"hp_restore": 45}},
-  {"id": "orange_potion", "name": "Pocao Laranja",     "type": "consumable","stackable": true,  "weight": 100, "buy_price": 200, "sell_price": 100, "effect": {"hp_restore": 140}},
+  {
+    "id": "jellopy", "name": "Jellopy", "type": "material", "stackable": true, "weight": 1, "sell_price": 3,
+    "description": "Uma gota de geleia viscosa coletada de Porings. Material básico para artesanato e alquimia. Apesar do aspecto repulsivo, artesãos pagam bem por elas."
+  },
+  {
+    "id": "sticky_mucus", "name": "Muco Grudento", "type": "material", "stackable": true, "weight": 1, "sell_price": 10,
+    "description": "Muco secretado por criaturas gelatinosas. Extremamente pegajoso e difícil de remover da roupa. Usado na fabricação de adesivos e armadilhas."
+  },
+  {
+    "id": "fluff", "name": "Fluff", "type": "material", "stackable": true, "weight": 1, "sell_price": 3,
+    "description": "Um punhado de pelo macio e levíssimo coletado de criaturas como Fabres. Usado em enchimentos de travesseiros e itens de conforto."
+  },
+  {
+    "id": "chrysalis", "name": "Crisálida", "type": "material", "stackable": true, "weight": 1, "sell_price": 10,
+    "description": "Casulo de uma borboleta em metamorfose. Internamente contém nutrientes concentrados. Alquimistas valorizam sua composição orgânica única."
+  },
+  {
+    "id": "zeny_pouch_sm", "name": "Bolsinha de Zeny", "type": "zeny_bag", "stackable": false, "weight": 1, "zeny_amount": 15,
+    "description": "Uma pequena bolsa de couro contendo 15 zeny em moedas. Dinheiro vivo que pode ser aberto diretamente no inventário."
+  },
+  {
+    "id": "red_potion", "name": "Poção Vermelha", "type": "consumable", "stackable": true, "weight": 70,
+    "buy_price": 50, "sell_price": 25, "effect": {"hp_restore": 45},
+    "description": "Uma poção de cor rubi que restaura HP quando consumida. Fabricada por alquimistas com ervas medicinais da floresta. Tem um leve sabor amargo."
+  },
+  {
+    "id": "orange_potion", "name": "Poção Laranja", "type": "consumable", "stackable": true, "weight": 100,
+    "buy_price": 200, "sell_price": 100, "effect": {"hp_restore": 140},
+    "description": "Uma poção mais potente de cor alaranjada. Restaura uma quantidade significativa de HP. Feita com ingredientes mais raros — mais cara, porém muito mais eficiente."
+  },
 
-  {"id": "short_sword",   "name": "Espada Curta",      "type": "weapon",    "stackable": false, "weight": 600, "slots": 1, "atk": 15, "buy_price": 200,  "sell_price": 100, "equip_slot": "weapon",  "requirements": {"level": 1}},
-  {"id": "knife",         "name": "Faca",              "type": "weapon",    "stackable": false, "weight": 300, "slots": 2, "atk": 10, "buy_price": 100,  "sell_price": 50,  "equip_slot": "weapon",  "requirements": {"level": 1}},
-  {"id": "wooden_staff",  "name": "Cajado de Madeira", "type": "weapon",    "stackable": false, "weight": 500, "slots": 2, "atk": 8,  "matk": 10, "buy_price": 150, "sell_price": 75,  "equip_slot": "weapon",  "requirements": {"level": 1}},
-  {"id": "short_bow",     "name": "Arco Curto",        "type": "weapon",    "stackable": false, "weight": 500, "slots": 1, "atk": 12, "buy_price": 180,  "sell_price": 90,  "equip_slot": "weapon",  "requirements": {"level": 1}},
+  {
+    "id": "short_sword", "name": "Espada Curta", "type": "weapon", "stackable": false, "weight": 600,
+    "slots": 1, "atk": 15, "buy_price": 200, "sell_price": 100, "equip_slot": "weapon",
+    "requirements": {"level": 1},
+    "description": "Uma espada curta de aço comum, equilibrada e fácil de manejar. Ideal para iniciantes que preferem combate corpo a corpo. Possui um slot para cards."
+  },
+  {
+    "id": "knife", "name": "Faca", "type": "weapon", "stackable": false, "weight": 300,
+    "slots": 2, "atk": 10, "buy_price": 100, "sell_price": 50, "equip_slot": "weapon",
+    "requirements": {"level": 1},
+    "description": "Uma faca leve e afiada. Menor ATK que uma espada, mas possui dois slots para cards e permite ataques rápidos. Favorita de ladinos e exploradores."
+  },
+  {
+    "id": "wooden_staff", "name": "Cajado de Madeira", "type": "weapon", "stackable": false, "weight": 500,
+    "slots": 2, "atk": 8, "matk": 10, "buy_price": 150, "sell_price": 75, "equip_slot": "weapon",
+    "requirements": {"level": 1},
+    "description": "Um cajado de carvalho entalhado por um mago aprendiz. Amplifica o poder mágico do portador. Usado por magos e clérigos que preferem magia a força física."
+  },
+  {
+    "id": "short_bow", "name": "Arco Curto", "type": "weapon", "stackable": false, "weight": 500,
+    "slots": 1, "atk": 12, "buy_price": 180, "sell_price": 90, "equip_slot": "weapon",
+    "requirements": {"level": 1},
+    "description": "Um arco compacto de madeira flexível. Permite atacar inimigos à distância com boa precisão. Requer flechas para funcionar. Favorito de arqueiros iniciantes."
+  },
 
-  {"id": "cotton_shirt",  "name": "Camisa de Algodao", "type": "armor",     "stackable": false, "weight": 200, "slots": 1, "def": 5,  "buy_price": 150, "sell_price": 75,  "equip_slot": "body",    "requirements": {"level": 1}},
-  {"id": "leather_armor", "name": "Armadura de Couro", "type": "armor",     "stackable": false, "weight": 600, "slots": 1, "def": 10, "buy_price": 400, "sell_price": 200, "equip_slot": "body",    "requirements": {"level": 3}},
-  {"id": "novice_hat",    "name": "Chapeu de Novice",  "type": "armor",     "stackable": false, "weight": 100, "slots": 0, "def": 3,  "buy_price": 100, "sell_price": 50,  "equip_slot": "head",    "requirements": {"level": 1}},
-  {"id": "guard_shield",  "name": "Escudo de Guarda",  "type": "armor",     "stackable": false, "weight": 400, "slots": 1, "def": 4,  "buy_price": 250, "sell_price": 125, "equip_slot": "offhand", "requirements": {"level": 1}},
-  {"id": "novice_shoes",  "name": "Sapatos de Novice", "type": "armor",     "stackable": false, "weight": 150, "slots": 0, "def": 2,  "buy_price": 100, "sell_price": 50,  "equip_slot": "feet",    "requirements": {"level": 1}},
+  {
+    "id": "cotton_shirt", "name": "Camisa de Algodão", "type": "armor", "stackable": false, "weight": 200,
+    "slots": 1, "def": 5, "buy_price": 150, "sell_price": 75, "equip_slot": "body",
+    "requirements": {"level": 1},
+    "description": "Uma camisa de algodão reforçado com costuras duplas. Oferece proteção básica sem comprometer a mobilidade. Usada pela maioria dos novices em Aethermoor."
+  },
+  {
+    "id": "leather_armor", "name": "Armadura de Couro", "type": "armor", "stackable": false, "weight": 600,
+    "slots": 1, "def": 10, "buy_price": 400, "sell_price": 200, "equip_slot": "body",
+    "requirements": {"level": 3},
+    "description": "Uma armadura de couro curtido com reforços metálicos nos pontos vitais. Proteção razoável sem perda excessiva de agilidade. Padrão para guerreiros de nível intermediário."
+  },
+  {
+    "id": "novice_hat", "name": "Chapéu de Novice", "type": "armor", "stackable": false, "weight": 100,
+    "slots": 0, "def": 3, "buy_price": 100, "sell_price": 50, "equip_slot": "head",
+    "requirements": {"level": 1},
+    "description": "O chapéu branco clássico dos novices de Aethermoor. Um símbolo de novos começos. Todo aventureiro recebe um ao partir pela primeira vez. Sem slots, mas cheio de significado."
+  },
+  {
+    "id": "guard_shield", "name": "Escudo de Guarda", "type": "armor", "stackable": false, "weight": 400,
+    "slots": 1, "def": 4, "buy_price": 250, "sell_price": 125, "equip_slot": "offhand",
+    "requirements": {"level": 1},
+    "description": "Um escudo circular de madeira revestida com metal. Equipado na mão auxiliar, aumenta a defesa significativamente. Os guardas da cidade usam versões mais elaboradas."
+  },
+  {
+    "id": "novice_shoes", "name": "Sapatos de Novice", "type": "armor", "stackable": false, "weight": 150,
+    "slots": 0, "def": 2, "buy_price": 100, "sell_price": 50, "equip_slot": "feet",
+    "requirements": {"level": 1},
+    "description": "Sapatos simples de couro macio, confortáveis para longas caminhadas. Todo novice começa com um par. Resistentes ao desgaste de dungeons úmidas."
+  },
 
-  {"id": "card_poring",   "name": "Card Poring",       "type": "card",      "stackable": false, "weight": 1,   "effect": {"luk": 2},  "equip_slot": null},
-  {"id": "card_fabre",    "name": "Card Fabre",        "type": "card",      "stackable": false, "weight": 1,   "effect": {"flee": 5}, "equip_slot": null}
+  {
+    "id": "card_poring", "name": "Card Poring", "type": "card", "stackable": false, "weight": 1,
+    "effect": {"luk": 2}, "equip_slot": null,
+    "description": "Um cartão raro com a essência de um Poring encapsulada. Ao ser inserido em um item com slot, aumenta permanentemente a sorte do portador em 2 pontos. Colecionadores pagam caro por ele."
+  },
+  {
+    "id": "card_fabre", "name": "Card Fabre", "type": "card", "stackable": false, "weight": 1,
+    "effect": {"flee": 5}, "equip_slot": null,
+    "description": "Um cartão da borboleta Fabre, símbolo de leveza e fuga. Inserido em equipamentos, concede ao portador reflexos aprimorados, aumentando a capacidade de esquiva em 5 pontos."
+  }
 ]

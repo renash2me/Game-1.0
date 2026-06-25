@@ -25,6 +25,7 @@ var _resize_grip                 = null
 var _resizing       : bool       = false
 var _res_mouse      : Vector2    = Vector2.ZERO
 var _res_size       : Vector2    = Vector2.ZERO
+var _tooltip                     = null
 
 func _ready() -> void:
 	_char_id = str(GameState.character.get("id", ""))
@@ -296,14 +297,24 @@ func _build_item_row(item: Dictionary, cat: Dictionary) -> HBoxContainer:
 	return row
 
 func _on_row_gui_input(event: InputEvent, item: Dictionary, cat: Dictionary) -> void:
-	if not (event is InputEventMouseButton):
+	if not (event is InputEventMouseButton) or not event.pressed:
 		return
-	if event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
-		return
-	if event.double_click:
-		_do_equip_item(item, cat)
-	else:
-		_select_item(item, cat)
+	match event.button_index:
+		MOUSE_BUTTON_LEFT:
+			if event.double_click:
+				_do_equip_item(item, cat)
+			else:
+				_select_item(item, cat)
+		MOUSE_BUTTON_RIGHT:
+			_show_item_tooltip(item, cat)
+
+func _show_item_tooltip(item: Dictionary, cat: Dictionary) -> void:
+	if _tooltip == null or not is_instance_valid(_tooltip):
+		_tooltip = load("res://scripts/ui/item_tooltip.gd").new()
+		_tooltip.visible = false
+		add_child(_tooltip)
+	var mouse := get_local_mouse_position()
+	_tooltip.show_item(item, cat, mouse + Vector2(16, 16))
 
 # ── Detalhe ───────────────────────────────────────────────────────────────────
 
