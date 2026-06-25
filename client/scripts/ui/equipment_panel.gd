@@ -11,10 +11,14 @@ const SLOTS : Array = [
 	["accessory2", "Acessório 2"],
 ]
 
-var _slot_data   : Dictionary = {}  # slot_name → {item_lbl, btn, inv_id}
+var _slot_data   : Dictionary = {}
 var _panel       : PanelContainer
 var _drag_offset : Vector2 = Vector2.ZERO
 var _dragging    : bool    = false
+var _resize_grip           = null
+var _resizing    : bool    = false
+var _res_mouse   : Vector2 = Vector2.ZERO
+var _res_size    : Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	_build_ui()
@@ -28,21 +32,14 @@ func _build_ui() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_PASS
 
-	var overlay := ColorRect.new()
-	overlay.color = Color(0, 0, 0, 0.55)
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(overlay)
-
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(350, 0)
+	_panel.custom_minimum_size = Vector2(290, 0)
 	add_child(_panel)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 6)
 	_panel.add_child(vbox)
 
-	# Barra de título arrastável
 	var title_bar := HBoxContainer.new()
 	title_bar.custom_minimum_size = Vector2(0, 26)
 	title_bar.add_theme_constant_override("separation", 4)
@@ -66,8 +63,19 @@ func _build_ui() -> void:
 
 	vbox.add_child(HSeparator.new())
 
+	# Área rolável com os slots — permite resize real
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 60)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(scroll)
+
+	var inner := VBoxContainer.new()
+	inner.add_theme_constant_override("separation", 4)
+	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(inner)
+
 	for slot_def in SLOTS:
-		vbox.add_child(_build_slot_row(slot_def[0], slot_def[1]))
+		inner.add_child(_build_slot_row(slot_def[0], slot_def[1]))
 
 	vbox.add_child(HSeparator.new())
 
@@ -75,6 +83,34 @@ func _build_ui() -> void:
 	close_btn.text = "Fechar"
 	close_btn.pressed.connect(_on_close)
 	vbox.add_child(close_btn)
+
+	_setup_resize()
+	WindowManager.register(_panel)
+
+func _setup_resize() -> void:
+	_resize_grip = ColorRect.new()
+	_resize_grip.size = Vector2(12, 12)
+	_resize_grip.color = Color(0.55, 0.55, 0.55, 0.65)
+	_resize_grip.mouse_filter = Control.MOUSE_FILTER_STOP
+	_resize_grip.mouse_default_cursor_shape = Control.CURSOR_FDIAGSIZE
+	_resize_grip.gui_input.connect(_on_grip_input)
+	add_child(_resize_grip)
+	call_deferred("_update_grip")
+
+func _update_grip() -> void:
+	if _resize_grip == null or not is_instance_valid(_resize_grip):
+		return
+	_resize_grip.position = _panel.position + _panel.size - Vector2(12, 12)
+
+func _on_grip_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_resizing = event.pressed
+		if event.pressed:
+			_res_mouse = get_local_mouse_position()
+			_res_size  = _panel.size
+
+func _exit_tree() -> void:
+	WindowManager.unregister(_panel)
 
 func _build_slot_row(slot_name: String, label: String) -> HBoxContainer:
 	var row := HBoxContainer.new()
@@ -109,7 +145,8 @@ func _center_panel() -> void:
 	if vp == null or _panel == null:
 		return
 	var s := vp.get_visible_rect().size
-	_panel.position = Vector2((s.x - 350.0) * 0.5, (s.y - 380.0) * 0.5)
+	_panel.position = Vector2((s.x - _panel.size.x) * 0.5, (s.y - _panel.size.y) * 0.5)
+	_update_grip()
 
 # ── Dados ─────────────────────────────────────────────────────────────────────
 
@@ -123,7 +160,6 @@ func _on_inv_loaded(code: int, data) -> void:
 	_refresh_slots(data)
 
 func _refresh_slots(inv: Array) -> void:
-	# Reset
 	for sname in _slot_data:
 		var sd = _slot_data[sname]
 		sd["item_lbl"].text     = "(vazio)"
@@ -132,7 +168,6 @@ func _refresh_slots(inv: Array) -> void:
 		sd["btn"].disabled      = false
 		sd["inv_id"]            = ""
 
-	# Preenche equipados
 	for item in inv:
 		if not item.get("is_equipped", false):
 			continue
@@ -146,7 +181,7 @@ func _refresh_slots(inv: Array) -> void:
 		sd["inv_id"]            = str(item.get("id", ""))
 
 func _fmt_item(item_id: String, refinement: int) -> String:
-	var parts := item_id.split("_")
+	var parts  := item_id.split("_")
 	var result := ""
 	for p in parts:
 		if p.length() > 0:
@@ -180,7 +215,7 @@ func _on_unequip_resp(code: int, _data) -> void:
 func _on_close() -> void:
 	visible = false
 
-# ── Drag ──────────────────────────────────────────────────────────────────────
+# ── Drag / Resize ─────────────────────────────────────────────────────────────
 
 func _on_title_drag(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -189,9 +224,22 @@ func _on_title_drag(event: InputEvent) -> void:
 			_drag_offset = _panel.position - get_local_mouse_position()
 
 func _input(event: InputEvent) -> void:
-	if not visible or not _dragging:
+	if not visible:
 		return
-	if event is InputEventMouseMotion:
-		_panel.position = get_local_mouse_position() + _drag_offset
-	elif event is InputEventMouseButton and not event.pressed:
-		_dragging = false
+	if _dragging:
+		if event is InputEventMouseMotion:
+			var raw := get_local_mouse_position() + _drag_offset
+			_panel.position = WindowManager.snap_move(_panel, raw)
+			_update_grip()
+		elif event is InputEventMouseButton and not event.pressed:
+			_dragging = false
+	if _resizing:
+		if event is InputEventMouseMotion:
+			var delta := get_local_mouse_position() - _res_mouse
+			var min_sz := _panel.custom_minimum_size
+			_panel.size = (_res_size + delta).max(min_sz)
+			_resize_grip.position = _panel.position + _panel.size - Vector2(12, 12)
+		elif event is InputEventMouseButton and not event.pressed:
+			_resizing = false
+			_panel.size = WindowManager.snap_size(_panel.size, _panel.custom_minimum_size)
+			_update_grip()

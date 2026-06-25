@@ -1,7 +1,5 @@
 extends Control
 
-# Abas: [label_botão, tipos_de_item_incluídos]
-# Array vazia = catch-all (tudo que não está nas outras abas)
 const TABS : Array = [
 	["Consumíveis",  ["consumable", "zeny_bag"]],
 	["Equipamentos", ["weapon", "armor"]],
@@ -9,23 +7,24 @@ const TABS : Array = [
 ]
 
 var _all_items      : Array      = []
-var _catalog        : Dictionary = {}   # item_id → item data do servidor
+var _catalog        : Dictionary = {}
 var _catalog_loaded : bool       = false
 var _active_tab     : int        = 0
 var _tab_btns       : Array      = []
 var _list_box       : VBoxContainer
-var _detail_visible : bool       = false
 var _detail_box     : VBoxContainer
 var _detail_name    : Label
 var _detail_info    : Label
-var _btn_equip      : Button
-var _btn_refine     : Button
 var _detail_err     : Label
 var _selected_item  : Dictionary = {}
 var _panel          : PanelContainer
 var _drag_offset    : Vector2    = Vector2.ZERO
 var _dragging       : bool       = false
 var _char_id        : String     = ""
+var _resize_grip                 = null
+var _resizing       : bool       = false
+var _res_mouse      : Vector2    = Vector2.ZERO
+var _res_size       : Vector2    = Vector2.ZERO
 
 func _ready() -> void:
 	_char_id = str(GameState.character.get("id", ""))
@@ -74,21 +73,15 @@ func _build_ui() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_PASS
 
-	var overlay := ColorRect.new()
-	overlay.color = Color(0, 0, 0, 0.0)   # sem escurecimento — inventário é janela flutuante
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.mouse_filter = Control.MOUSE_FILTER_PASS
-	add_child(overlay)
-
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(390, 0)
+	_panel.custom_minimum_size = Vector2(300, 0)
 	add_child(_panel)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 4)
 	_panel.add_child(vbox)
 
-	# ── Barra de título ────────────────────────────────────────────────────────
+	# Barra de título arrastável
 	var title_bar := HBoxContainer.new()
 	title_bar.custom_minimum_size = Vector2(0, 26)
 	title_bar.add_theme_constant_override("separation", 4)
@@ -112,7 +105,7 @@ func _build_ui() -> void:
 
 	vbox.add_child(HSeparator.new())
 
-	# ── Abas ──────────────────────────────────────────────────────────────────
+	# Abas
 	var tab_row := HBoxContainer.new()
 	tab_row.add_theme_constant_override("separation", 2)
 	vbox.add_child(tab_row)
@@ -128,12 +121,11 @@ func _build_ui() -> void:
 		_tab_btns.append(btn)
 
 	_highlight_tab(0)
-
 	vbox.add_child(HSeparator.new())
 
-	# ── Lista de itens ─────────────────────────────────────────────────────────
+	# Lista de itens — área rolável
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 210)
+	scroll.custom_minimum_size = Vector2(0, 60)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(scroll)
 
@@ -144,7 +136,7 @@ func _build_ui() -> void:
 
 	vbox.add_child(HSeparator.new())
 
-	# ── Detalhe do item ────────────────────────────────────────────────────────
+	# Detalhe do item selecionado
 	_detail_box = VBoxContainer.new()
 	_detail_box.add_theme_constant_override("separation", 4)
 	_detail_box.visible = false
@@ -160,34 +152,16 @@ func _build_ui() -> void:
 	_detail_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_detail_box.add_child(_detail_info)
 
-	var action_row := HBoxContainer.new()
-	action_row.add_theme_constant_override("separation", 6)
-	_detail_box.add_child(action_row)
-
-	_btn_equip = Button.new()
-	_btn_equip.text = "Equipar"
-	_btn_equip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_btn_equip.visible = false
-	_btn_equip.pressed.connect(_on_equip_pressed)
-	action_row.add_child(_btn_equip)
-
-	_btn_refine = Button.new()
-	_btn_refine.text = "Refinar"
-	_btn_refine.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_btn_refine.visible = false
-	_btn_refine.pressed.connect(_on_refine_pressed)
-	action_row.add_child(_btn_refine)
-
-	var close_detail := Button.new()
-	close_detail.text = "Fechar"
-	close_detail.pressed.connect(_hide_detail)
-	action_row.add_child(close_detail)
-
 	_detail_err = Label.new()
 	_detail_err.add_theme_font_size_override("font_size", 11)
 	_detail_err.modulate = Color(1, 0.35, 0.35)
 	_detail_err.text = ""
 	_detail_box.add_child(_detail_err)
+
+	var close_detail := Button.new()
+	close_detail.text = "Fechar detalhe"
+	close_detail.pressed.connect(_hide_detail)
+	_detail_box.add_child(close_detail)
 
 	vbox.add_child(HSeparator.new())
 
@@ -197,12 +171,41 @@ func _build_ui() -> void:
 	close_btn.pressed.connect(func(): visible = false)
 	vbox.add_child(close_btn)
 
+	_setup_resize()
+	WindowManager.register(_panel)
+
+func _setup_resize() -> void:
+	_resize_grip = ColorRect.new()
+	_resize_grip.size = Vector2(12, 12)
+	_resize_grip.color = Color(0.55, 0.55, 0.55, 0.65)
+	_resize_grip.mouse_filter = Control.MOUSE_FILTER_STOP
+	_resize_grip.mouse_default_cursor_shape = Control.CURSOR_FDIAGSIZE
+	_resize_grip.gui_input.connect(_on_grip_input)
+	add_child(_resize_grip)
+	call_deferred("_update_grip")
+
+func _update_grip() -> void:
+	if _resize_grip == null or not is_instance_valid(_resize_grip):
+		return
+	_resize_grip.position = _panel.position + _panel.size - Vector2(12, 12)
+
+func _on_grip_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_resizing = event.pressed
+		if event.pressed:
+			_res_mouse = get_local_mouse_position()
+			_res_size  = _panel.size
+
+func _exit_tree() -> void:
+	WindowManager.unregister(_panel)
+
 func _default_position() -> void:
 	var vp := get_viewport()
 	if vp == null or _panel == null:
 		return
 	var s := vp.get_visible_rect().size
-	_panel.position = Vector2(s.x - 400.0, 40.0)
+	_panel.position = Vector2(s.x - _panel.size.x - 10.0, 40.0)
+	_update_grip()
 
 # ── Abas ──────────────────────────────────────────────────────────────────────
 
@@ -227,13 +230,11 @@ func _render_list() -> void:
 	var is_catch_all   : bool  = included_types.is_empty()
 
 	for item in _all_items:
-		# Itens equipados não aparecem no inventário — use o painel Equip (E)
 		if item.get("is_equipped", false):
 			continue
-
-		var item_id    : String = item.get("item_id", "")
-		var item_cat   : Dictionary = _catalog.get(item_id, {})
-		var item_type  : String = item_cat.get("type", "")
+		var item_id   : String     = item.get("item_id", "")
+		var item_cat  : Dictionary = _catalog.get(item_id, {})
+		var item_type : String     = item_cat.get("type", "")
 
 		var matches := false
 		if is_catch_all:
@@ -244,7 +245,6 @@ func _render_list() -> void:
 		if matches:
 			_list_box.add_child(_build_item_row(item, item_cat))
 
-	# Mensagem se aba vazia
 	if _list_box.get_child_count() == 0:
 		var empty_lbl := Label.new()
 		empty_lbl.text = "Nenhum item nesta aba."
@@ -257,6 +257,8 @@ func _build_item_row(item: Dictionary, cat: Dictionary) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	row.custom_minimum_size = Vector2(0, 26)
+	row.mouse_filter = Control.MOUSE_FILTER_STOP
+	row.gui_input.connect(_on_row_gui_input.bind(item, cat))
 
 	var name_str : String = cat.get("name", item.get("item_id", "?"))
 	var qty      : int    = item.get("quantity", 1)
@@ -266,13 +268,14 @@ func _build_item_row(item: Dictionary, cat: Dictionary) -> HBoxContainer:
 	name_lbl.text = name_str
 	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_lbl.add_theme_font_size_override("font_size", 11)
+	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(name_lbl)
 
-	# Badge: quantidade ou refinamento
 	var badge := Label.new()
 	badge.add_theme_font_size_override("font_size", 10)
 	badge.custom_minimum_size = Vector2(36, 0)
 	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if refine > 0:
 		badge.text = "+%d" % refine
 		badge.modulate = Color(1.0, 0.85, 0.3)
@@ -281,14 +284,26 @@ func _build_item_row(item: Dictionary, cat: Dictionary) -> HBoxContainer:
 		badge.modulate = Color(0.7, 0.7, 0.7)
 	row.add_child(badge)
 
-	var sel_btn := Button.new()
-	sel_btn.text = ">"
-	sel_btn.custom_minimum_size = Vector2(26, 0)
-	sel_btn.add_theme_font_size_override("font_size", 10)
-	sel_btn.pressed.connect(_select_item.bind(item, cat))
-	row.add_child(sel_btn)
+	# Indicador visual para itens equipáveis
+	if cat.get("equip_slot", "") != "":
+		var hint := Label.new()
+		hint.text = "2×"
+		hint.add_theme_font_size_override("font_size", 9)
+		hint.modulate = Color(0.5, 0.8, 1.0, 0.7)
+		hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(hint)
 
 	return row
+
+func _on_row_gui_input(event: InputEvent, item: Dictionary, cat: Dictionary) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	if event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
+		return
+	if event.double_click:
+		_do_equip_item(item, cat)
+	else:
+		_select_item(item, cat)
 
 # ── Detalhe ───────────────────────────────────────────────────────────────────
 
@@ -299,15 +314,7 @@ func _select_item(item: Dictionary, cat: Dictionary) -> void:
 	var name_str : String = cat.get("name", item.get("item_id", "?"))
 	var refine   : int    = item.get("refinement", 0)
 	_detail_name.text = name_str + (" +%d" % refine if refine > 0 else "")
-
 	_detail_info.text = _build_item_desc(item, cat)
-
-	var has_slot : bool = cat.get("equip_slot", "") != ""
-	_btn_equip.visible  = has_slot
-	_btn_refine.visible = has_slot and refine < 7
-	_btn_equip.disabled = false
-	_btn_refine.disabled = false
-
 	_detail_box.visible = true
 
 func _build_item_desc(item: Dictionary, cat: Dictionary) -> String:
@@ -319,23 +326,21 @@ func _build_item_desc(item: Dictionary, cat: Dictionary) -> String:
 
 	match cat.get("type", ""):
 		"weapon":
-			var atk : int = cat.get("atk", 0)
+			var atk  : int = cat.get("atk", 0)
 			var matk : int = cat.get("matk", 0)
-			var slots : int = cat.get("slots", 0)
+			var slots: int = cat.get("slots", 0)
 			if atk  > 0: lines.append("ATK: %d" % atk)
 			if matk > 0: lines.append("MATK: %d" % matk)
 			if slots > 0: lines.append("Slots: %d" % slots)
 		"armor":
-			var def : int = cat.get("def", 0)
-			var slots : int = cat.get("slots", 0)
+			var def  : int = cat.get("def", 0)
+			var slots: int = cat.get("slots", 0)
 			if def   > 0: lines.append("DEF: %d" % def)
 			if slots > 0: lines.append("Slots: %d" % slots)
 		"consumable":
 			var effect : Dictionary = cat.get("effect", {})
-			if effect.has("hp_restore"):
-				lines.append("Restaura %d HP" % effect["hp_restore"])
-			if effect.has("sp_restore"):
-				lines.append("Restaura %d SP" % effect["sp_restore"])
+			if effect.has("hp_restore"): lines.append("Restaura %d HP" % effect["hp_restore"])
+			if effect.has("sp_restore"): lines.append("Restaura %d SP" % effect["sp_restore"])
 		"zeny_bag":
 			lines.append("Contém %d zeny" % cat.get("zeny_amount", 0))
 		"card":
@@ -351,6 +356,9 @@ func _build_item_desc(item: Dictionary, cat: Dictionary) -> String:
 	if weight > 0:
 		lines.append("Peso: %.1f" % (weight / 10.0))
 
+	if cat.get("equip_slot", "") != "":
+		lines.append("— duplo-clique para equipar —")
+
 	return "\n".join(lines)
 
 func _hide_detail() -> void:
@@ -358,15 +366,15 @@ func _hide_detail() -> void:
 	_detail_box.visible = false
 	_detail_err.text = ""
 
-# ── Ações ─────────────────────────────────────────────────────────────────────
+# ── Equipar (duplo clique) ────────────────────────────────────────────────────
 
-func _on_equip_pressed() -> void:
-	if _selected_item.is_empty():
+func _do_equip_item(item: Dictionary, cat: Dictionary) -> void:
+	if cat.get("equip_slot", "") == "":
 		return
-	_btn_equip.disabled = true
+	_detail_err.text = ""
 	ApiClient.post(
 		"/api/inventory/%s/equip" % _char_id,
-		{"inventory_item_id": _selected_item.get("id", "")},
+		{"inventory_item_id": item.get("id", "")},
 		_on_equip_resp
 	)
 
@@ -374,30 +382,10 @@ func _on_equip_resp(code: int, _data) -> void:
 	if code == 200:
 		_load_inventory()
 	else:
-		_btn_equip.disabled = false
 		_detail_err.text = "Erro ao equipar."
+		_detail_box.visible = true
 
-func _on_refine_pressed() -> void:
-	if _selected_item.is_empty():
-		return
-	_btn_refine.disabled = true
-	ApiClient.post(
-		"/api/inventory/%s/refine" % _char_id,
-		{"inventory_item_id": _selected_item.get("id", "")},
-		_on_refine_resp
-	)
-
-func _on_refine_resp(code: int, data) -> void:
-	if code == 200:
-		_load_inventory()
-	else:
-		_btn_refine.disabled = false
-		if data != null and data.has("detail"):
-			_detail_err.text = str(data["detail"])
-		else:
-			_detail_err.text = "Erro ao refinar."
-
-# ── Drag ──────────────────────────────────────────────────────────────────────
+# ── Drag / Resize ─────────────────────────────────────────────────────────────
 
 func _on_title_drag(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -406,9 +394,22 @@ func _on_title_drag(event: InputEvent) -> void:
 			_drag_offset = _panel.position - get_local_mouse_position()
 
 func _input(event: InputEvent) -> void:
-	if not visible or not _dragging:
+	if not visible:
 		return
-	if event is InputEventMouseMotion:
-		_panel.position = get_local_mouse_position() + _drag_offset
-	elif event is InputEventMouseButton and not event.pressed:
-		_dragging = false
+	if _dragging:
+		if event is InputEventMouseMotion:
+			var raw := get_local_mouse_position() + _drag_offset
+			_panel.position = WindowManager.snap_move(_panel, raw)
+			_update_grip()
+		elif event is InputEventMouseButton and not event.pressed:
+			_dragging = false
+	if _resizing:
+		if event is InputEventMouseMotion:
+			var delta := get_local_mouse_position() - _res_mouse
+			var min_sz := _panel.custom_minimum_size
+			_panel.size = (_res_size + delta).max(min_sz)
+			_resize_grip.position = _panel.position + _panel.size - Vector2(12, 12)
+		elif event is InputEventMouseButton and not event.pressed:
+			_resizing = false
+			_panel.size = WindowManager.snap_size(_panel.size, _panel.custom_minimum_size)
+			_update_grip()

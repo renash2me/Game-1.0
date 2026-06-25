@@ -161,9 +161,13 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # ── Drag / Resize ─────────────────────────────────────────────────────────────
 
+func _exit_tree() -> void:
+	WindowManager.unregister($Panel)
+
 func _setup_hud_drag() -> void:
 	var panel := $Panel
 	panel.set_anchors_preset(Control.PRESET_TOP_LEFT, true)
+	WindowManager.register(panel)
 
 	# Barra de arraste no topo do VBox
 	var handle := Label.new()
@@ -232,7 +236,8 @@ func _on_hud_grip_input(event: InputEvent) -> void:
 func _input(event: InputEvent) -> void:
 	if _hud_dragging:
 		if event is InputEventMouseMotion:
-			$Panel.position = _hud_mouse() + _hud_drag_offset
+			var raw := _hud_mouse() + _hud_drag_offset
+			$Panel.position = WindowManager.snap_move($Panel, raw)
 			_update_hud_grip()
 		elif event is InputEventMouseButton and not event.pressed:
 			_hud_dragging = false
