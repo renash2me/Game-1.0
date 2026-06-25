@@ -1,39 +1,50 @@
-extends Node2D
+extends Node3D
 
-# ── Referências de cena ───────────────────────────────────────────────────────
-@onready var _player_layer : Node2D    = $Layers/Players
-@onready var _mob_layer    : Node2D    = $Layers/Mobs
-@onready var _drop_layer   : Node2D    = $Layers/Drops
-@onready var _camera       : Camera2D  = $Camera2D
+# ── Constantes ─────────────────────────────────────────────────────────────────
+# Escala: 1 unidade de servidor = WORLD_SCALE unidades 3D.
+# Com 0.025, mapa de 800 server units → 20 unidades 3D (confortável na câmera).
+const WORLD_SCALE   : float  = 0.025
+const CAM_OFFSET    := Vector3(0.0, 12.0, 8.5)   # offset relativo ao player
+const CAM_ORTHO_DEF : float  = 10.0
+const CAM_ORTHO_MIN : float  = 3.5
+const CAM_ORTHO_MAX : float  = 22.0
+const CAM_ZOOM_STEP : float  = 0.7
+const MOVE_SPEED    : float  = 2.5               # 3D units/s ≈ 100 server/s
+const SEND_INTERVAL : float  = 0.1
+
+# ── Referências ────────────────────────────────────────────────────────────────
+@onready var _player_layer : Node3D     = $Layers/Players
+@onready var _mob_layer    : Node3D     = $Layers/Mobs
+@onready var _drop_layer   : Node3D     = $Layers/Drops
+@onready var _camera       : Camera3D   = $Camera3D
 @onready var _hud          : CanvasLayer = $HUD
-@onready var _chat_ui      : Control   = $HUD/Chat
-@onready var _inv_ui       : Control   = $HUD/Inventory
-var _local_name : String = ""
-var _coords_lbl          # Label de coordenadas no HUD
+@onready var _chat_ui      : Control    = $HUD/Chat
+@onready var _inv_ui       : Control    = $HUD/Inventory
 
-# ── Entidades no mapa ─────────────────────────────────────────────────────────
-var _players : Dictionary = {}   # char_id → Sprite2D
-var _mobs    : Dictionary = {}   # instance_id → mob node
-var _drops   : Dictionary = {}   # drop_id → drop node
-
-# ── Movimento ─────────────────────────────────────────────────────────────────
-const MOVE_SPEED : float = 120.0
-const SEND_INTERVAL : float = 0.1
-var _move_target : Vector2 = Vector2.ZERO
+# ── Estado ─────────────────────────────────────────────────────────────────────
+var _local_name  : String  = ""
+var _coords_lbl           = null
+var _cam_ortho   : float   = CAM_ORTHO_DEF
+var _move_target : Vector3 = Vector3.ZERO
 var _moving      : bool    = false
 var _left_held   : bool    = false
 var _send_timer  : float   = 0.0
-var _last_sent   : Vector2 = Vector2.ZERO
+var _last_sent   : Vector3 = Vector3.ZERO
+var _players     : Dictionary = {}
+var _mobs        : Dictionary = {}
+var _drops       : Dictionary = {}
+
+# ── Inicialização ──────────────────────────────────────────────────────────────
 
 func _ready() -> void:
 	_local_name = str(GameState.character.get("name", ""))
 	CharacterData.apply_from_response(GameState.character)
-	_add_ground()
 
-	# Inventário começa escondido; chat fica visível
+	_setup_camera()
+	_setup_world()
+
 	_inv_ui.visible = false
 
-	# Label de coordenadas no canto inferior esquerdo
 	_coords_lbl = Label.new()
 	_coords_lbl.add_theme_font_size_override("font_size", 11)
 	_coords_lbl.modulate = Color(1.0, 1.0, 0.5, 0.85)
@@ -43,15 +54,66 @@ func _ready() -> void:
 
 	var px : float = GameState.character.get("pos_x", 0.0)
 	var py : float = GameState.character.get("pos_y", 0.0)
-	_move_target = Vector2(px, py)
+	_move_target = _to_3d(px, py)
 	_ensure_local_player(px, py)
-	_camera.position = Vector2(px, py)
 
 	WsClient.message_received.connect(_on_ws_message)
 	WsClient.ws_disconnected.connect(_on_ws_disconnected)
+	MapManager.load_map(GameState.character.get("current_map", "starter_village"))
 
-	var map_id : String = GameState.character.get("current_map", "starter_village")
-	MapManager.load_map(map_id)
+func _setup_camera() -> void:
+	_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	_camera.size       = _cam_ortho
+	_camera.near       = 0.05
+	_camera.far        = 600.0
+	_camera.position   = CAM_OFFSET
+	_camera.look_at(Vector3(0.0, 0.5, 0.0), Vector3.UP)
+
+func _setup_world() -> void:
+	# Céu / fundo
+	var env_node := WorldEnvironment.new()
+	var env      := Environment.new()
+	env.background_mode  = Environment.BG_COLOR
+	env.background_color = Color(0.10, 0.13, 0.18)
+	add_child(env_node)
+	env_node.environment = env
+
+	# Chão
+	var ground := MeshInstance3D.new()
+	var plane  := PlaneMesh.new()
+	plane.size = Vector2(600.0, 600.0)
+	ground.mesh = plane
+	var gmat := StandardMaterial3D.new()
+	gmat.albedo_color = Color(0.17, 0.24, 0.12)
+	gmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ground.material_override = gmat
+	add_child(ground)
+
+	# Grade de referência visual (linhas a cada 40 server units)
+	var line_mat := StandardMaterial3D.new()
+	line_mat.albedo_color = Color(0.0, 0.0, 0.0, 0.18)
+	line_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	line_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+
+	var mesh_x := BoxMesh.new()
+	mesh_x.size = Vector3(0.018, 0.002, 580.0)
+	var mesh_z := BoxMesh.new()
+	mesh_z.size = Vector3(580.0, 0.002, 0.018)
+
+	for i in range(-15, 16):
+		var step : float = i * 40.0 * WORLD_SCALE
+
+		var lx := MeshInstance3D.new()
+		lx.mesh              = mesh_x
+		lx.material_override = line_mat
+		lx.position          = Vector3(step, 0.001, 0.0)
+		add_child(lx)
+
+		var lz := MeshInstance3D.new()
+		lz.mesh              = mesh_z
+		lz.material_override = line_mat
+		lz.position          = Vector3(0.0, 0.001, step)
+		add_child(lz)
 
 func _anchor_coords_lbl() -> void:
 	if _coords_lbl == null:
@@ -59,155 +121,146 @@ func _anchor_coords_lbl() -> void:
 	var vp_size := get_viewport().get_visible_rect().size
 	_coords_lbl.position = Vector2(8.0, vp_size.y - 24.0)
 
-func _add_ground() -> void:
-	var layer := CanvasLayer.new()
-	layer.layer = -10
-	add_child(layer)
-	var ground := ColorRect.new()
-	ground.color = Color(0.17, 0.24, 0.12)
-	ground.size = Vector2(8000, 8000)
-	ground.position = Vector2(-4000, -4000)
-	layer.add_child(ground)
-	# Grade sutil para dar sensacao de profundidade
-	for gx in range(-20, 21):
-		var line := ColorRect.new()
-		line.color = Color(0.0, 0.0, 0.0, 0.08)
-		line.size = Vector2(1, 8000)
-		line.position = Vector2(gx * 64 - 0.5, -4000)
-		layer.add_child(line)
-	for gy in range(-20, 21):
-		var line := ColorRect.new()
-		line.color = Color(0.0, 0.0, 0.0, 0.08)
-		line.size = Vector2(8000, 1)
-		line.position = Vector2(-4000, gy * 64 - 0.5)
-		layer.add_child(line)
+# ── Conversão de coordenadas ───────────────────────────────────────────────────
 
-# ── Input ─────────────────────────────────────────────────────────────────────
+func _to_3d(sx: float, sy: float) -> Vector3:
+	return Vector3(sx * WORLD_SCALE, 0.0, sy * WORLD_SCALE)
+
+func _to_server(v: Vector3) -> Vector2:
+	return Vector2(v.x / WORLD_SCALE, v.z / WORLD_SCALE)
+
+# ── Raycast mouse → plano do chão (y = 0) ────────────────────────────────────
+
+func _ground_at_mouse() -> Vector3:
+	var mouse := get_viewport().get_mouse_position()
+	var from  := _camera.project_ray_origin(mouse)
+	var ndir  := _camera.project_ray_normal(mouse)
+	if absf(ndir.y) < 0.0001:
+		return Vector3.ZERO
+	var t := -from.y / ndir.y
+	return from + ndir * t
+
+# ── Input ──────────────────────────────────────────────────────────────────────
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			if event.pressed:
-				if _inv_ui.visible:
-					return
-				_left_held = true
-				var target := get_global_mouse_position()
-				if Input.is_action_pressed("attack"):
-					_try_attack_at(target)
+		match event.button_index:
+			MOUSE_BUTTON_WHEEL_UP:
+				_cam_ortho  = clamp(_cam_ortho - CAM_ZOOM_STEP, CAM_ORTHO_MIN, CAM_ORTHO_MAX)
+				_camera.size = _cam_ortho
+				get_viewport().set_input_as_handled()
+				return
+			MOUSE_BUTTON_WHEEL_DOWN:
+				_cam_ortho  = clamp(_cam_ortho + CAM_ZOOM_STEP, CAM_ORTHO_MIN, CAM_ORTHO_MAX)
+				_camera.size = _cam_ortho
+				get_viewport().set_input_as_handled()
+				return
+			MOUSE_BUTTON_LEFT:
+				if event.pressed:
+					if _inv_ui.visible:
+						return
+					_left_held = true
+					var target := _ground_at_mouse()
+					if Input.is_action_pressed("attack"):
+						_try_attack_at(target)
+					else:
+						_move_target = target
+						_moving = true
+						_spawn_click_marker(target)
 				else:
-					_move_target = target
-					_moving = true
-					_spawn_click_marker(target)
-			else:
-				_left_held = false
-		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-			_try_pickup_at(get_global_mouse_position())
-	elif event is InputEventMouseMotion and _left_held:
-		if not _inv_ui.visible and not Input.is_action_pressed("attack"):
-			_move_target = get_global_mouse_position()
+					_left_held = false
+			MOUSE_BUTTON_RIGHT:
+				if event.pressed:
+					_try_pickup_at(_ground_at_mouse())
+	elif event is InputEventMouseMotion:
+		if _left_held and not _inv_ui.visible and not Input.is_action_pressed("attack"):
+			_move_target = _ground_at_mouse()
 			_moving = true
 	elif event.is_action_pressed("inventory"):
 		_inv_ui.visible = !_inv_ui.visible
 
-func _spawn_click_marker(world_pos: Vector2) -> void:
-	var marker := Node2D.new()
-	add_child(marker)
-	marker.position = world_pos
-
-	var outer := ColorRect.new()
-	outer.size = Vector2(18, 18)
-	outer.position = Vector2(-9, -9)
-	outer.color = Color(1.0, 1.0, 1.0, 0.75)
-	marker.add_child(outer)
-
-	var inner := ColorRect.new()
-	inner.size = Vector2(6, 6)
-	inner.position = Vector2(-3, -3)
-	inner.color = Color(1.0, 0.9, 0.3, 1.0)
-	marker.add_child(inner)
-
-	var tw := create_tween()
-	tw.tween_property(marker, "scale", Vector2(1.8, 1.8), 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.parallel().tween_property(outer, "modulate:a", 0.0, 0.22)
-	tw.tween_callback(marker.queue_free)
-
-# ── Process loop ──────────────────────────────────────────────────────────────
+# ── Process loop ───────────────────────────────────────────────────────────────
 
 func _process(delta: float) -> void:
-	# Atualiza coordenadas na tela
-	if _coords_lbl != null:
-		var pnode = _get_local_player_node()
-		if pnode != null:
-			_coords_lbl.text = "X: %.0f  Y: %.0f" % [pnode.position.x, pnode.position.y]
-		else:
+	var local_node := _get_local_player_node()
+
+	# Câmera segue o player
+	if local_node != null:
+		var pp := local_node.position
+		_camera.position = pp + CAM_OFFSET
+		_camera.look_at(pp + Vector3(0.0, 0.5, 0.0), Vector3.UP)
+
+		if _coords_lbl != null:
+			var sv := _to_server(pp)
+			_coords_lbl.text = "X: %.0f  Y: %.0f" % [sv.x, sv.y]
+	else:
+		if _coords_lbl != null:
 			_coords_lbl.text = "X: --  Y: --"
 
-	if not _moving:
+	if not _moving or local_node == null:
 		return
 
-	var local_node := _get_local_player_node()
-	if local_node == null:
-		return
+	var dir := _move_target - local_node.position
+	dir.y = 0.0
 
-	var current := local_node.position
-	var dir := (_move_target - current)
-	if dir.length() < 2.0:
-		local_node.position = _move_target
+	if dir.length() < 0.05:
+		local_node.position   = _move_target
+		local_node.position.y = 0.0
 		_moving = false
-		_broadcast_move(_move_target)
+		_broadcast_move(local_node.position)
 		return
 
-	local_node.position += dir.normalized() * MOVE_SPEED * delta
-	_camera.position = local_node.position
+	local_node.position   += dir.normalized() * MOVE_SPEED * delta
+	local_node.position.y  = 0.0
 
-	# Envia posição a cada SEND_INTERVAL
 	_send_timer -= delta
 	if _send_timer <= 0.0:
 		_send_timer = SEND_INTERVAL
 		var pos := local_node.position
-		if pos.distance_to(_last_sent) > 1.0:
+		if pos.distance_to(_last_sent) > 0.05:
 			_broadcast_move(pos)
 			_last_sent = pos
 
-func _broadcast_move(pos: Vector2) -> void:
+func _broadcast_move(pos: Vector3) -> void:
+	var sv := _to_server(pos)
 	WsClient.send({
 		"type": "MOVE",
 		"payload": {
-			"x": pos.x,
-			"y": pos.y,
+			"x":      sv.x,
+			"y":      sv.y,
 			"map_id": GameState.character.get("current_map", "starter_village")
 		}
 	})
 
-# ── Ataque ────────────────────────────────────────────────────────────────────
+# ── Combate ────────────────────────────────────────────────────────────────────
 
-func _try_attack_at(pos: Vector2) -> void:
-	var best_id := ""
-	var best_dist := 80.0  # alcance máximo em pixels
-	for instance_id in _mobs:
-		var mob_node = _mobs[instance_id]
-		var d: float = mob_node.position.distance_to(pos)
+func _try_attack_at(ground_pos: Vector3) -> void:
+	var best_id   := ""
+	var best_dist := 3.5  # units 3D
+	for iid in _mobs:
+		var mn = _mobs[iid]
+		var d : float = Vector2(mn.position.x - ground_pos.x,
+		                        mn.position.z - ground_pos.z).length()
 		if d < best_dist:
 			best_dist = d
-			best_id = instance_id
+			best_id   = iid
 	if best_id != "":
 		WsClient.send({"type": "ATTACK", "payload": {"target_id": best_id, "attack_type": "melee"}})
 
-# ── Pickup ────────────────────────────────────────────────────────────────────
-
-func _try_pickup_at(pos: Vector2) -> void:
-	var best_id := ""
-	var best_dist := 60.0
+func _try_pickup_at(ground_pos: Vector3) -> void:
+	var best_id   := ""
+	var best_dist := 2.0
 	for drop_id in _drops:
 		var dn = _drops[drop_id]
-		var dn_dist: float = dn.position.distance_to(pos)
-		if dn_dist < best_dist:
-			best_dist = dn_dist
-			best_id = drop_id
+		var d : float = Vector2(dn.position.x - ground_pos.x,
+		                        dn.position.z - ground_pos.z).length()
+		if d < best_dist:
+			best_dist = d
+			best_id   = drop_id
 	if best_id != "":
 		WsClient.send({"type": "PICKUP", "payload": {"drop_id": best_id}})
 
-# ── WebSocket Messages ────────────────────────────────────────────────────────
+# ── WebSocket ──────────────────────────────────────────────────────────────────
 
 func _on_ws_message(type: String, payload: Dictionary) -> void:
 	match type:
@@ -226,9 +279,9 @@ func _on_ws_message(type: String, payload: Dictionary) -> void:
 
 func _handle_map_players(payload: Dictionary) -> void:
 	for p in payload.get("players", []):
-		var cid : String = p.get("character_id", "")
-		var px : float = p.get("x", 0.0)
-		var py : float = p.get("y", 0.0)
+		var cid   : String = p.get("character_id", "")
+		var px    : float  = p.get("x", 0.0)
+		var py    : float  = p.get("y", 0.0)
 		var pname : String = p.get("name", "?")
 		if cid == str(GameState.character.get("id", "")):
 			_ensure_local_player(px, py)
@@ -241,21 +294,22 @@ func _handle_mob_spawn(payload: Dictionary) -> void:
 
 func _handle_player_move(payload: Dictionary) -> void:
 	var cid : String = payload.get("character_id", "")
-	var pos := Vector2(payload.get("x", 0.0), payload.get("y", 0.0))
 	if cid in _players:
-		_players[cid].position = pos
+		_players[cid].position = _to_3d(payload.get("x", 0.0), payload.get("y", 0.0))
 
 func _handle_mob_move(payload: Dictionary) -> void:
 	var iid : String = payload.get("instance_id", "")
-	var pos := Vector2(payload.get("x", 0.0), payload.get("y", 0.0))
 	if iid in _mobs:
-		_mobs[iid].position = pos
+		_mobs[iid].position = _to_3d(payload.get("x", 0.0), payload.get("y", 0.0))
 
 func _handle_player_join(payload: Dictionary) -> void:
-	var cid : String = payload.get("character_id", "")
+	var cid   : String = payload.get("character_id", "")
 	var pname : String = payload.get("name", "?")
-	var pos := Vector2(payload.get("x", 0.0), payload.get("y", 0.0))
-	_ensure_remote_player(cid, pname, pos.x, pos.y)
+	if cid not in _players:
+		var node := _build_player_node(pname, Color.WHITE)
+		node.position = _to_3d(payload.get("x", 0.0), payload.get("y", 0.0))
+		_player_layer.add_child(node)
+		_players[cid] = node
 
 func _handle_player_leave(payload: Dictionary) -> void:
 	var cid : String = payload.get("character_id", "")
@@ -271,7 +325,7 @@ func _handle_mob_death(payload: Dictionary) -> void:
 
 func _handle_drop_appear(payload: Dictionary) -> void:
 	var drop_id : String = payload.get("drop_id", "")
-	var pos := Vector2(payload.get("x", 0.0), payload.get("y", 0.0))
+	var pos := _to_3d(payload.get("x", 0.0), payload.get("y", 0.0))
 	var node := _build_drop_node(drop_id, pos)
 	_drop_layer.add_child(node)
 	_drops[drop_id] = node
@@ -285,103 +339,99 @@ func _handle_drop_taken(payload: Dictionary) -> void:
 func _handle_damage(payload: Dictionary) -> void:
 	var target  : String = payload.get("target", "")
 	var dmg     : int    = payload.get("damage", 0)
-	var new_hp  : int    = payload.get("hp", CharacterData.hp)
+	var new_hp  : int    = payload.get("hp",     CharacterData.hp)
 	var new_mhp : int    = payload.get("max_hp", CharacterData.max_hp)
-	var my_id   : String = str(GameState.character.get("id", ""))
-	if target == my_id:
+	if target == str(GameState.character.get("id", "")):
 		CharacterData.apply_damage(new_hp, new_mhp)
-	var pos := Vector2.ZERO
-	if target in _players:
-		pos = _players[target].position
-	elif target in _mobs:
-		pos = _mobs[target].position
-	if pos != Vector2.ZERO:
+	var pos := Vector3.ZERO
+	if target in _players: pos = _players[target].position
+	elif target in _mobs:  pos = _mobs[target].position
+	if pos != Vector3.ZERO:
 		_spawn_damage_label(pos, str(dmg))
 
 func _handle_level_up(payload: Dictionary) -> void:
 	CharacterData.apply_level_up(
-		payload.get("new_level", CharacterData.level),
-		payload.get("stat_points_gained", 0),
+		payload.get("new_level",           CharacterData.level),
+		payload.get("stat_points_gained",  0),
 		payload.get("skill_points_gained", 0)
 	)
 	CharacterData.apply_xp(
-		payload.get("xp", CharacterData.xp),
+		payload.get("xp",         CharacterData.xp),
 		payload.get("xp_to_next", CharacterData.xp_to_next)
 	)
 
 func _handle_map_change(payload: Dictionary) -> void:
-	var map_id : String = payload.get("map_id", "")
-	GameState.character["current_map"] = map_id
-	GameState.character["pos_x"] = payload.get("pos_x", 0.0)
-	GameState.character["pos_y"] = payload.get("pos_y", 0.0)
-	MapManager.load_map(map_id)
+	GameState.character["current_map"] = payload.get("map_id", "")
+	GameState.character["pos_x"]       = payload.get("pos_x", 0.0)
+	GameState.character["pos_y"]       = payload.get("pos_y", 0.0)
+	MapManager.load_map(payload.get("map_id", ""))
 	get_tree().reload_current_scene()
 
-# ── Utilitários de nó ─────────────────────────────────────────────────────────
+# ── Construtores de nó ─────────────────────────────────────────────────────────
+
+func _make_texture(color: Color, w: int, h: int) -> ImageTexture:
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(color)
+	return ImageTexture.create_from_image(img)
+
+func _make_shadow(radius: float) -> MeshInstance3D:
+	var node := MeshInstance3D.new()
+	var cm   := CylinderMesh.new()
+	cm.top_radius    = radius
+	cm.bottom_radius = radius
+	cm.height        = 0.01
+	node.mesh = cm
+	var mat  := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.0, 0.0, 0.0, 0.32)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	node.material_override = mat
+	node.position = Vector3(0.0, 0.005, 0.0)
+	return node
 
 func _ensure_local_player(px: float, py: float) -> void:
 	var my_id := str(GameState.character.get("id", "__local__"))
 	if my_id not in _players:
 		var node := _build_player_node(_local_name, Color.CYAN)
-		node.position = Vector2(px, py)
+		node.position = _to_3d(px, py)
 		_player_layer.add_child(node)
 		_players[my_id] = node
-		_camera.position = node.position
 
 func _ensure_remote_player(cid: String, pname: String, px: float, py: float) -> void:
 	if cid not in _players:
 		var node := _build_player_node(pname, Color.WHITE)
-		node.position = Vector2(px, py)
+		node.position = _to_3d(px, py)
 		_player_layer.add_child(node)
 		_players[cid] = node
 
-func _get_local_player_node() -> Node2D:
+func _get_local_player_node() -> Node3D:
 	var my_id := str(GameState.character.get("id", "__local__"))
 	return _players.get(my_id, null)
 
-func _build_player_node(pname: String, color: Color) -> Node2D:
-	var root := Node2D.new()
+func _build_player_node(pname: String, color: Color) -> Node3D:
+	var root := Node3D.new()
 
-	# Sombra
-	var shadow := ColorRect.new()
-	shadow.size = Vector2(18, 6)
-	shadow.position = Vector2(-9, -4)
-	shadow.color = Color(0, 0, 0, 0.28)
-	root.add_child(shadow)
+	# Sprite 2D billboard (placeholder até ter sprite sheet real)
+	var sprite := Sprite3D.new()
+	sprite.texture       = _make_texture(color, 12, 22)
+	sprite.pixel_size    = 0.055
+	sprite.billboard     = BaseMaterial3D.BILLBOARD_ENABLED
+	sprite.shaded        = false
+	sprite.no_depth_test = false
+	sprite.position      = Vector3(0.0, 0.7, 0.0)
+	root.add_child(sprite)
 
-	# Corpo
-	var body := ColorRect.new()
-	body.size = Vector2(14, 16)
-	body.position = Vector2(-7, -22)
-	body.color = color
-	root.add_child(body)
+	root.add_child(_make_shadow(0.28))
 
-	# Cabeca
-	var head := ColorRect.new()
-	head.size = Vector2(12, 11)
-	head.position = Vector2(-6, -35)
-	head.color = color.lightened(0.18)
-	root.add_child(head)
-
-	# Olhos
-	var el := ColorRect.new()
-	el.size = Vector2(3, 3)
-	el.position = Vector2(-4, -32)
-	el.color = Color(0.05, 0.05, 0.05)
-	root.add_child(el)
-
-	var er := ColorRect.new()
-	er.size = Vector2(3, 3)
-	er.position = Vector2(1, -32)
-	er.color = Color(0.05, 0.05, 0.05)
-	root.add_child(er)
-
-	# Nome
-	var lbl := Label.new()
-	lbl.text = pname
-	lbl.position = Vector2(-28, -50)
-	lbl.add_theme_font_size_override("font_size", 10)
-	lbl.modulate = Color(1.0, 1.0, 0.7)
+	# Nome acima (Label3D billboard)
+	var lbl := Label3D.new()
+	lbl.text          = pname
+	lbl.billboard     = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.font_size     = 30
+	lbl.modulate      = Color(1.0, 1.0, 0.7)
+	lbl.outline_size  = 8
+	lbl.no_depth_test = true
+	lbl.position      = Vector3(0.0, 1.6, 0.0)
 	root.add_child(lbl)
 
 	return root
@@ -390,114 +440,101 @@ func _spawn_mob(mob: Dictionary) -> void:
 	var iid : String = mob.get("instance_id", "")
 	if iid in _mobs:
 		return
-	var mob_id : String = mob.get("monster_id", "mob")
-	var root := Node2D.new()
 
-	# Sombra
-	var shadow := ColorRect.new()
-	shadow.size = Vector2(22, 6)
-	shadow.position = Vector2(-11, -4)
-	shadow.color = Color(0, 0, 0, 0.25)
-	root.add_child(shadow)
+	var root := Node3D.new()
 
-	# Corpo arredondado (simulado com rects sobrepostos)
-	var body := ColorRect.new()
-	body.size = Vector2(20, 16)
-	body.position = Vector2(-10, -20)
-	body.color = Color(0.95, 0.3, 0.3)
-	root.add_child(body)
+	var sprite := Sprite3D.new()
+	sprite.texture       = _make_texture(Color(0.95, 0.3, 0.3), 16, 16)
+	sprite.pixel_size    = 0.055
+	sprite.billboard     = BaseMaterial3D.BILLBOARD_ENABLED
+	sprite.shaded        = false
+	sprite.position      = Vector3(0.0, 0.55, 0.0)
+	root.add_child(sprite)
 
-	var body_top := ColorRect.new()
-	body_top.size = Vector2(16, 4)
-	body_top.position = Vector2(-8, -24)
-	body_top.color = Color(0.95, 0.3, 0.3)
-	root.add_child(body_top)
+	root.add_child(_make_shadow(0.32))
 
-	# Olhos brancos + pupila
-	var ew_l := ColorRect.new()
-	ew_l.size = Vector2(5, 5)
-	ew_l.position = Vector2(-7, -18)
-	ew_l.color = Color(1, 1, 1)
-	root.add_child(ew_l)
-
-	var ep_l := ColorRect.new()
-	ep_l.size = Vector2(2, 3)
-	ep_l.position = Vector2(-6, -17)
-	ep_l.color = Color(0.1, 0.05, 0.05)
-	root.add_child(ep_l)
-
-	var ew_r := ColorRect.new()
-	ew_r.size = Vector2(5, 5)
-	ew_r.position = Vector2(2, -18)
-	ew_r.color = Color(1, 1, 1)
-	root.add_child(ew_r)
-
-	var ep_r := ColorRect.new()
-	ep_r.size = Vector2(2, 3)
-	ep_r.position = Vector2(3, -17)
-	ep_r.color = Color(0.1, 0.05, 0.05)
-	root.add_child(ep_r)
-
-	# Nome do mob
-	var lbl := Label.new()
-	lbl.text = mob_id
-	lbl.position = Vector2(-20, -35)
-	lbl.add_theme_font_size_override("font_size", 9)
-	lbl.modulate = Color(1.0, 0.6, 0.6)
+	var lbl := Label3D.new()
+	lbl.text          = mob.get("monster_id", "mob")
+	lbl.billboard     = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.font_size     = 24
+	lbl.modulate      = Color(1.0, 0.6, 0.6)
+	lbl.outline_size  = 6
+	lbl.no_depth_test = true
+	lbl.position      = Vector3(0.0, 1.3, 0.0)
 	root.add_child(lbl)
 
-	root.position = Vector2(mob.get("x", 0.0), mob.get("y", 0.0))
+	root.position = _to_3d(mob.get("x", 0.0), mob.get("y", 0.0))
 	_mob_layer.add_child(root)
 	_mobs[iid] = root
 
-func _build_drop_node(_drop_id: String, pos: Vector2) -> Node2D:
-	var root := Node2D.new()
-
-	# Brilho externo
-	var glow := ColorRect.new()
-	glow.size = Vector2(14, 14)
-	glow.position = Vector2(-7, -7)
-	glow.color = Color(1.0, 0.9, 0.1, 0.35)
-	root.add_child(glow)
-
-	# Gema
-	var gem := ColorRect.new()
-	gem.size = Vector2(9, 9)
-	gem.position = Vector2(-4.5, -4.5)
-	gem.color = Color(1.0, 0.85, 0.0)
-	root.add_child(gem)
-
-	# Reflexo
-	var shine := ColorRect.new()
-	shine.size = Vector2(3, 3)
-	shine.position = Vector2(-3.5, -3.5)
-	shine.color = Color(1.0, 1.0, 0.95)
-	root.add_child(shine)
-
+func _build_drop_node(_drop_id: String, pos: Vector3) -> Node3D:
+	var root := Node3D.new()
 	root.position = pos
 
-	# Animacao de bobbing
+	var sprite := Sprite3D.new()
+	sprite.texture       = _make_texture(Color(1.0, 0.85, 0.0), 8, 8)
+	sprite.pixel_size    = 0.06
+	sprite.billboard     = BaseMaterial3D.BILLBOARD_ENABLED
+	sprite.shaded        = false
+	sprite.position      = Vector3(0.0, 0.2, 0.0)
+	root.add_child(sprite)
+
+	# Brilho no chão
+	var glow := MeshInstance3D.new()
+	var gm   := CylinderMesh.new()
+	gm.top_radius    = 0.18
+	gm.bottom_radius = 0.18
+	gm.height        = 0.005
+	glow.mesh = gm
+	var gmat := StandardMaterial3D.new()
+	gmat.albedo_color = Color(1.0, 0.85, 0.0, 0.38)
+	gmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	gmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glow.material_override = gmat
+	root.add_child(glow)
+
+	# Bobbing do sprite
 	var tw := root.create_tween()
 	tw.set_loops()
-	tw.tween_property(root, "position:y", pos.y - 5.0, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(root, "position:y", pos.y, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(sprite, "position:y", 0.42, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(sprite, "position:y", 0.20, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 	return root
 
-func _spawn_damage_label(pos: Vector2, text: String) -> void:
-	var lbl := Label.new()
-	lbl.text = text
-	var offset := Vector2(randf_range(-8.0, 8.0), -20.0)
-	lbl.position = pos + offset
-	lbl.add_theme_font_size_override("font_size", 16)
-	lbl.modulate = Color(1.0, 0.88, 0.1)
-	add_child(lbl)
-	var tween := create_tween()
-	tween.tween_property(lbl, "position", lbl.position + Vector2(0, -42), 0.7)
-	tween.parallel().tween_property(lbl, "modulate:a", 0.0, 0.7)
-	tween.tween_callback(lbl.queue_free)
+func _spawn_click_marker(world_pos: Vector3) -> void:
+	var marker := MeshInstance3D.new()
+	var cyl    := CylinderMesh.new()
+	cyl.top_radius    = 0.22
+	cyl.bottom_radius = 0.22
+	cyl.height        = 0.01
+	marker.mesh = cyl
+	var mat  := StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.95, 0.3)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	marker.material_override = mat
+	marker.position = world_pos + Vector3(0.0, 0.012, 0.0)
+	add_child(marker)
 
-# ── Desconexão ────────────────────────────────────────────────────────────────
+	var tw := create_tween()
+	tw.tween_property(marker, "scale", Vector3(4.0, 1.0, 4.0), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(marker.queue_free)
+
+func _spawn_damage_label(pos: Vector3, text: String) -> void:
+	var lbl := Label3D.new()
+	lbl.text          = text
+	lbl.position      = pos + Vector3(randf_range(-0.3, 0.3), 1.4, 0.0)
+	lbl.billboard     = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.font_size     = 60
+	lbl.modulate      = Color(1.0, 0.88, 0.1)
+	lbl.outline_size  = 12
+	lbl.no_depth_test = true
+	add_child(lbl)
+	var tw := create_tween()
+	tw.tween_property(lbl, "position:y", lbl.position.y + 2.0, 0.7)
+	tw.parallel().tween_property(lbl, "modulate:a", 0.0, 0.7)
+	tw.tween_callback(lbl.queue_free)
+
+# ── Desconexão ─────────────────────────────────────────────────────────────────
 
 func _on_ws_disconnected() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")

@@ -5,20 +5,18 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/chat.tscn" id="3_chat"]
 [ext_resource type="PackedScene" path="res://scenes/ui/inventory_ui.tscn" id="4_inventory"]
 
-[node name="GameWorld" type="Node2D"]
+[node name="GameWorld" type="Node3D"]
 script = ExtResource("1_gameworld")
 
-[node name="Camera2D" type="Camera2D" parent="."]
-zoom = Vector2(2, 2)
-enabled = true
+[node name="Camera3D" type="Camera3D" parent="."]
 
-[node name="Layers" type="Node2D" parent="."]
+[node name="Layers" type="Node3D" parent="."]
 
-[node name="Drops" type="Node2D" parent="Layers"]
+[node name="Drops" type="Node3D" parent="Layers"]
 
-[node name="Mobs" type="Node2D" parent="Layers"]
+[node name="Mobs" type="Node3D" parent="Layers"]
 
-[node name="Players" type="Node2D" parent="Layers"]
+[node name="Players" type="Node3D" parent="Layers"]
 
 [node name="HUD" type="CanvasLayer" parent="."]
 
