@@ -25,7 +25,7 @@ var _last_sent  : Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	_local_name = str(GameState.character.get("name", ""))
-	CharacterData.init_from_character(GameState.character)
+	CharacterData.apply_from_response(GameState.character)
 
 	var px : float = GameState.character.get("pos_x", 0.0)
 	var py : float = GameState.character.get("pos_y", 0.0)
