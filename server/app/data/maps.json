@@ -4,10 +4,23 @@
     "name": "Vila Inicial",
     "width": 800,
     "height": 600,
-    "is_safe": true,
+    "is_safe": false,
     "tags": [],
     "music": "village_theme",
-    "spawn_points": [],
+    "spawn_points": [
+      {
+        "mob_id": "poring",
+        "count": 3,
+        "respawn_seconds": 20,
+        "area": {"x1": -170.0, "y1": -210.0, "x2": 170.0, "y2": -70.0}
+      },
+      {
+        "mob_id": "fabre",
+        "count": 1,
+        "respawn_seconds": 30,
+        "area": {"x1": 90.0, "y1": 70.0, "x2": 130.0, "y2": 110.0}
+      }
+    ],
     "portals": [
       {
         "id": "to_greenfield",

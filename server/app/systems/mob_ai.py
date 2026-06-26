@@ -15,6 +15,7 @@ TICK = 0.3          # segundos por tick
 ATTACK_CD = 1500    # ms entre ataques do mob
 WANDER_CD = 3.0     # segundos entre mudanças de destino no wander
 WANDER_RADIUS = 150 # pixels máx do centro do spawn ao vagar
+CHASE_LEASH = 350   # server units: dist máx do spawn antes do mob desistir e voltar
 
 
 async def run_map_ai_loop(map_id: str) -> None:
@@ -116,8 +117,12 @@ async def _tick_mob(
 
     # ── AGGRO ─────────────────────────────────────────────────────────────
     elif state == "aggro":
-        if not target_id:
+        spawn_cx = float(mob_raw.get("spawn_cx", x))
+        spawn_cy = float(mob_raw.get("spawn_cy", y))
+        if not target_id or _dist(x, y, spawn_cx, spawn_cy) > CHASE_LEASH:
+            # sem alvo, ou foi puxado longe demais do território → desiste e volta a vagar
             updates["state"] = "idle"
+            updates["target_id"] = ""
         else:
             tpos = await _player_pos(target_id, r)
             if tpos is None:

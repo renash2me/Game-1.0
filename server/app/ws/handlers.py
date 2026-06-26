@@ -113,6 +113,7 @@ async def send_map_state(manager: ConnectionManager, character_id: uuid.UUID) ->
             "instance_id": iid,
             "mob_id": mob_raw.get("mob_id"),
             "name": mob_data.get("name", "?"),
+            "ai_type": mob_data.get("ai_type", "passive"),
             "hp": int(mob_raw.get("hp", 0)),
             "hp_max": int(mob_raw.get("hp_max", 1)),
             "x": float(mob_raw.get("x", 0)),

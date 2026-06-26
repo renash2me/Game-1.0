@@ -10,7 +10,8 @@ const CAM_ORTHO_MIN : float  = 3.5
 const CAM_ORTHO_MAX : float  = 22.0
 const CAM_ZOOM_STEP : float  = 0.7
 const MOVE_SPEED    : float  = 2.5               # 3D units/s ≈ 100 server/s
-const SEND_INTERVAL : float  = 0.1
+const GRID_SERVER   : float  = 40.0              # lado da célula (server units) — movimento estilo Ragnarok
+const REMOTE_SMOOTH : float  = 12.0              # suavização de mobs/jogadores remotos (updates discretos)
 
 # ── Referências ────────────────────────────────────────────────────────────────
 @onready var _player_layer : Node3D     = $Layers/Players
@@ -24,12 +25,12 @@ const SEND_INTERVAL : float  = 0.1
 var _local_name  : String  = ""
 var _coords_lbl           = null
 var _cam_ortho   : float   = CAM_ORTHO_DEF
-var _move_target : Vector3 = Vector3.ZERO
-var _moving      : bool    = false
+var _path        : Array[Vector3] = []   # waypoints (centros de célula) até o destino
 var _left_held   : bool    = false
-var _drag_to_move : bool   = false   # o hold atual deve arrastar-mover? (false se clicou num mob)
-var _send_timer  : float   = 0.0
-var _last_sent   : Vector3 = Vector3.ZERO
+var _drag_to_move : bool   = false       # o hold atual deve arrastar-mover? (false se clicou num mob)
+var _dest_cell   : Vector2i = Vector2i(0x7fffffff, 0x7fffffff)  # última célula de destino (evita recalcular no drag)
+var _mob_dest    : Dictionary = {}        # instance_id -> Vector3 alvo (suavização de movimento)
+var _remote_dest : Dictionary = {}        # character_id -> Vector3 alvo (suavização de movimento)
 var _players     : Dictionary = {}
 var _mobs        : Dictionary = {}
 var _drops       : Dictionary = {}
@@ -54,7 +55,6 @@ func _ready() -> void:
 
 	var px : float = GameState.character.get("pos_x", 0.0)
 	var py : float = GameState.character.get("pos_y", 0.0)
-	_move_target = _to_3d(px, py)
 	_ensure_local_player(px, py)
 
 	WsClient.message_received.connect(_on_ws_message)
@@ -170,9 +170,7 @@ func _unhandled_input(event: InputEvent) -> void:
 						_attack_mob(mob_id)
 					else:
 						_drag_to_move = true
-						_move_target  = target
-						_moving       = true
-						_spawn_click_marker(target)
+						_set_destination(target)
 				else:
 					_left_held    = false
 					_drag_to_move = false
@@ -181,8 +179,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					_try_pickup_at(_ground_at_mouse())
 	elif event is InputEventMouseMotion:
 		if _left_held and _drag_to_move and not _inv_ui.visible:
-			_move_target = _ground_at_mouse()
-			_moving = true
+			_set_destination(_ground_at_mouse())
 	elif event.is_action_pressed("inventory"):
 		_inv_ui.visible = !_inv_ui.visible
 
@@ -204,29 +201,67 @@ func _process(delta: float) -> void:
 		if _coords_lbl != null:
 			_coords_lbl.text = "X: --  Y: --"
 
-	if not _moving or local_node == null:
+	# Movimento local: caminha célula a célula até esvaziar o caminho
+	if local_node != null and not _path.is_empty():
+		var target : Vector3 = _path[0]
+		var dir := target - local_node.position
+		dir.y = 0.0
+		var step := MOVE_SPEED * delta
+		if dir.length() <= step:
+			local_node.position = Vector3(target.x, 0.0, target.z)
+			_path.remove_at(0)
+			_broadcast_move(local_node.position)   # avisa servidor ao chegar em cada célula
+		else:
+			local_node.position   += dir.normalized() * step
+			local_node.position.y  = 0.0
+
+	# Mobs e jogadores remotos recebem updates discretos → suaviza a interpolação
+	_smooth_others(delta)
+
+# ── Movimento em grade (estilo Ragnarok) ────────────────────────────────────────
+
+func _set_destination(world_point: Vector3) -> void:
+	var local_node := _get_local_player_node()
+	if local_node == null:
 		return
+	var goal := _server_to_cell(_to_server(world_point))
+	if goal == _dest_cell:
+		return   # mesmo destino: não recalcula (evita reconstruir o caminho a cada pixel no drag)
+	_dest_cell = goal
+	var start := _server_to_cell(_to_server(local_node.position))
+	_path = _build_path(start, goal)
+	if not _path.is_empty():
+		_spawn_click_marker(_path[_path.size() - 1])
 
-	var dir := _move_target - local_node.position
-	dir.y = 0.0
+func _server_to_cell(sv: Vector2) -> Vector2i:
+	return Vector2i(roundi(sv.x / GRID_SERVER), roundi(sv.y / GRID_SERVER))
 
-	if dir.length() < 0.05:
-		local_node.position   = _move_target
-		local_node.position.y = 0.0
-		_moving = false
-		_broadcast_move(local_node.position)
-		return
+func _cell_to_3d(cell: Vector2i) -> Vector3:
+	return _to_3d(float(cell.x) * GRID_SERVER, float(cell.y) * GRID_SERVER)
 
-	local_node.position   += dir.normalized() * MOVE_SPEED * delta
-	local_node.position.y  = 0.0
+func _build_path(start: Vector2i, goal: Vector2i) -> Array[Vector3]:
+	# Passos em 8 direções (Chebyshev): anda na diagonal até alinhar, depois reto.
+	# Sem obstáculos no mapa plano, isso equivale ao caminho ótimo (A* seria exagero).
+	var pts : Array[Vector3] = []
+	var cur := start
+	var guard := 0
+	while cur != goal and guard < 512:
+		guard += 1
+		cur.x += signi(goal.x - cur.x)
+		cur.y += signi(goal.y - cur.y)
+		pts.append(_cell_to_3d(cur))
+	return pts
 
-	_send_timer -= delta
-	if _send_timer <= 0.0:
-		_send_timer = SEND_INTERVAL
-		var pos := local_node.position
-		if pos.distance_to(_last_sent) > 0.05:
-			_broadcast_move(pos)
-			_last_sent = pos
+func _smooth_others(delta: float) -> void:
+	var t := clampf(delta * REMOTE_SMOOTH, 0.0, 1.0)
+	for iid in _mob_dest:
+		if iid in _mobs:
+			var d : Vector3 = _mob_dest[iid]
+			_mobs[iid].position = _mobs[iid].position.lerp(d, t)
+	for cid in _remote_dest:
+		if cid in _players:
+			var d : Vector3 = _remote_dest[cid]
+			_players[cid].position = _players[cid].position.lerp(d, t)
 
 func _broadcast_move(pos: Vector3) -> void:
 	var sv := _to_server(pos)
@@ -303,13 +338,14 @@ func _handle_mob_spawn(payload: Dictionary) -> void:
 
 func _handle_player_move(payload: Dictionary) -> void:
 	var cid : String = payload.get("character_id", "")
-	if cid in _players:
-		_players[cid].position = _to_3d(payload.get("x", 0.0), payload.get("y", 0.0))
+	# guarda só o alvo; a interpolação acontece em _smooth_others (não teleporta)
+	if cid in _players and cid != str(GameState.character.get("id", "")):
+		_remote_dest[cid] = _to_3d(payload.get("x", 0.0), payload.get("y", 0.0))
 
 func _handle_mob_move(payload: Dictionary) -> void:
 	var iid : String = payload.get("instance_id", "")
 	if iid in _mobs:
-		_mobs[iid].position = _to_3d(payload.get("x", 0.0), payload.get("y", 0.0))
+		_mob_dest[iid] = _to_3d(payload.get("x", 0.0), payload.get("y", 0.0))
 
 func _handle_player_join(payload: Dictionary) -> void:
 	var cid   : String = payload.get("character_id", "")
@@ -319,18 +355,21 @@ func _handle_player_join(payload: Dictionary) -> void:
 		node.position = _to_3d(payload.get("x", 0.0), payload.get("y", 0.0))
 		_player_layer.add_child(node)
 		_players[cid] = node
+		_remote_dest[cid] = node.position
 
 func _handle_player_leave(payload: Dictionary) -> void:
 	var cid : String = payload.get("character_id", "")
 	if cid in _players:
 		_players[cid].queue_free()
 		_players.erase(cid)
+		_remote_dest.erase(cid)
 
 func _handle_mob_death(payload: Dictionary) -> void:
 	var iid : String = payload.get("instance_id", "")
 	if iid in _mobs:
 		_mobs[iid].queue_free()
 		_mobs.erase(iid)
+		_mob_dest.erase(iid)
 
 func _handle_drop_appear(payload: Dictionary) -> void:
 	var drop_id : String = payload.get("drop_id", "")
@@ -346,17 +385,24 @@ func _handle_drop_taken(payload: Dictionary) -> void:
 		_drops.erase(drop_id)
 
 func _handle_damage(payload: Dictionary) -> void:
-	var target  : String = payload.get("target", "")
-	var dmg     : int    = payload.get("damage", 0)
-	var new_hp  : int    = payload.get("hp",     CharacterData.hp)
-	var new_mhp : int    = payload.get("max_hp", CharacterData.max_hp)
-	if target == str(GameState.character.get("id", "")):
+	# O servidor envia target_id / target_type / target_hp / target_hp_max
+	var target_id : String = payload.get("target_id", "")
+	var ttype     : String = payload.get("target_type", "")
+	var is_miss   : bool   = payload.get("is_miss", false)
+	var dmg       : int    = payload.get("damage", 0)
+	var new_hp    : int    = payload.get("target_hp",     CharacterData.hp)
+	var new_mhp   : int    = payload.get("target_hp_max", CharacterData.max_hp)
+
+	# Atualiza o HP do jogador local quando ele é o alvo
+	if ttype == "player" and target_id == str(GameState.character.get("id", "")):
 		CharacterData.apply_damage(new_hp, new_mhp)
-	var pos := Vector3.ZERO
-	if target in _players: pos = _players[target].position
-	elif target in _mobs:  pos = _mobs[target].position
-	if pos != Vector3.ZERO:
-		_spawn_damage_label(pos, str(dmg))
+
+	# Número de dano flutuante sobre o alvo (jogador ou mob)
+	var node = _players.get(target_id, null)
+	if node == null:
+		node = _mobs.get(target_id, null)
+	if node != null:
+		_spawn_damage_label(node.position, "Miss" if is_miss else str(dmg))
 
 func _handle_level_up(payload: Dictionary) -> void:
 	CharacterData.apply_level_up(
@@ -412,6 +458,7 @@ func _ensure_remote_player(cid: String, pname: String, px: float, py: float) -> 
 		node.position = _to_3d(px, py)
 		_player_layer.add_child(node)
 		_players[cid] = node
+		_remote_dest[cid] = node.position
 
 func _get_local_player_node() -> Node3D:
 	var my_id := str(GameState.character.get("id", "__local__"))
@@ -450,10 +497,14 @@ func _spawn_mob(mob: Dictionary) -> void:
 	if iid in _mobs:
 		return
 
+	var aggressive : bool = mob.get("ai_type", "passive") == "aggressive"
+	var body_color := Color(0.85, 0.2, 0.2) if aggressive else Color(1.0, 0.55, 0.65)
+	var name_color := Color(1.0, 0.45, 0.35) if aggressive else Color(0.85, 0.95, 0.85)
+
 	var root := Node3D.new()
 
 	var sprite := Sprite3D.new()
-	sprite.texture       = _make_texture(Color(0.95, 0.3, 0.3), 16, 16)
+	sprite.texture       = _make_texture(body_color, 16, 16)
 	sprite.pixel_size    = 0.055
 	sprite.billboard     = BaseMaterial3D.BILLBOARD_ENABLED
 	sprite.shaded        = false
@@ -463,10 +514,10 @@ func _spawn_mob(mob: Dictionary) -> void:
 	root.add_child(_make_shadow(0.32))
 
 	var lbl := Label3D.new()
-	lbl.text          = mob.get("monster_id", "mob")
+	lbl.text          = mob.get("name", mob.get("mob_id", "mob"))
 	lbl.billboard     = BaseMaterial3D.BILLBOARD_ENABLED
 	lbl.font_size     = 24
-	lbl.modulate      = Color(1.0, 0.6, 0.6)
+	lbl.modulate      = name_color
 	lbl.outline_size  = 6
 	lbl.no_depth_test = true
 	lbl.position      = Vector3(0.0, 1.3, 0.0)
@@ -475,6 +526,7 @@ func _spawn_mob(mob: Dictionary) -> void:
 	root.position = _to_3d(mob.get("x", 0.0), mob.get("y", 0.0))
 	_mob_layer.add_child(root)
 	_mobs[iid] = root
+	_mob_dest[iid] = root.position
 
 func _build_drop_node(_drop_id: String, pos: Vector3) -> Node3D:
 	var root := Node3D.new()

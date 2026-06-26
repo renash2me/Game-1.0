@@ -12,20 +12,23 @@ logger = structlog.get_logger()
 
 DROP_EXPIRE_SECONDS = 300  # drops somem após 5 min
 
+# Mantém referência forte às tasks de IA. Sem isso o event loop só guarda
+# referência fraca e o coletor de lixo pode encerrar os loops silenciosamente.
+_AI_TASKS: list[asyncio.Task] = []
+
 
 async def initialize_all_maps() -> None:
     """Spawna mobs iniciais em todos os mapas e inicia os loops de IA."""
     from app.systems.mob_ai import run_map_ai_loop
 
     maps = get_maps()
-    tasks = []
     for map_data in maps.values():
         map_id = map_data["id"]
         await spawn_map_mobs(map_id, map_data.get("spawn_points", []))
         if map_data.get("spawn_points"):
-            tasks.append(asyncio.create_task(run_map_ai_loop(map_id), name=f"ai_{map_id}"))
+            _AI_TASKS.append(asyncio.create_task(run_map_ai_loop(map_id), name=f"ai_{map_id}"))
 
-    logger.info("mob_ai_started", maps=len(tasks))
+    logger.info("mob_ai_started", maps=len(_AI_TASKS))
 
 
 async def spawn_map_mobs(map_id: str, spawn_points: list) -> None:
@@ -80,17 +83,19 @@ async def respawn_mob_later(mob_id: str, map_id: str, area: dict, delay: int) ->
         mob_data = get_monsters().get(mob_id, {})
         r = get_redis()
         mob_raw = await r.hgetall(f"mob:{instance_id}")
+        # O cliente espera payload.mobs (lista) — mesma forma do send_map_state
         await broadcast_map(manager, map_id, {
             "type": "MOB_SPAWN",
-            "payload": {
+            "payload": {"mobs": [{
                 "instance_id": instance_id,
                 "mob_id": mob_id,
                 "name": mob_data.get("name", mob_id),
+                "ai_type": mob_data.get("ai_type", "passive"),
                 "hp": mob_data.get("hp_max", 1),
                 "hp_max": mob_data.get("hp_max", 1),
                 "x": float(mob_raw.get("x", 0)),
                 "y": float(mob_raw.get("y", 0)),
-            },
+            }]},
         })
 
 
