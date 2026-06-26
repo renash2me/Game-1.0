@@ -97,6 +97,39 @@ async def create_character(
     return character
 
 
+@router.delete("/{character_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_character(
+    character_id: uuid.UUID,
+    player: Player = Depends(get_current_player),
+    session: AsyncSession = Depends(get_session),
+):
+    """Exclui permanentemente o personagem e TODOS os seus dados
+    (itens do inventário, quests). Dinheiro/atributos vão junto no registro."""
+    from sqlalchemy import delete as sa_delete
+    from app.models.inventory import InventoryItem
+    from app.models.quest import Quest
+
+    result = await session.execute(
+        select(Character).where(Character.id == character_id, Character.player_id == player.id)
+    )
+    character = result.scalar_one_or_none()
+    if not character:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Personagem não encontrado")
+
+    await session.execute(sa_delete(InventoryItem).where(InventoryItem.character_id == character_id))
+    await session.execute(sa_delete(Quest).where(Quest.character_id == character_id))
+    await session.delete(character)
+    await session.commit()
+
+    # Limpeza best-effort no Redis (caso houvesse cache)
+    try:
+        from app.redis_client import get_redis
+        r = get_redis()
+        await r.delete(f"char_stats:{character_id}", f"pos:{character_id}")
+    except Exception:
+        pass
+
+
 @router.get("", response_model=list[CharacterResponse])
 async def list_characters(
     player: Player = Depends(get_current_player),

@@ -20,6 +20,9 @@ func get_req(path: String, callback: Callable) -> void:
 func put(path: String, body: Dictionary, callback: Callable) -> void:
 	_request(HTTPClient.METHOD_PUT, path, body, callback)
 
+func del(path: String, callback: Callable) -> void:
+	_request(HTTPClient.METHOD_DELETE, path, {}, callback)
+
 # ── Interno ───────────────────────────────────────────────────────────────────
 
 func _request(method: int, path: String, body: Dictionary, callback: Callable) -> void:
@@ -35,7 +38,8 @@ func _request(method: int, path: String, body: Dictionary, callback: Callable) -
 			http.queue_free()
 	)
 
-	var body_str := "" if method == HTTPClient.METHOD_GET else JSON.stringify(body)
+	var no_body := method == HTTPClient.METHOD_GET or method == HTTPClient.METHOD_DELETE
+	var body_str := "" if no_body else JSON.stringify(body)
 	var err := http.request(BASE_URL + path, _get_headers(), method, body_str)
 	if err != OK:
 		push_error("ApiClient: falha ao iniciar request para " + path)

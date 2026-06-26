@@ -28,6 +28,21 @@ columns = 3
 theme_override_constants/h_separation = 10
 theme_override_constants/v_separation = 10
 
+[node name="ActionRow" type="HBoxContainer" parent="VBox"]
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="BtnSelecionar" type="Button" parent="VBox/ActionRow"]
+text = "Selecionar"
+disabled = true
+custom_minimum_size = Vector2(150, 40)
+
+[node name="BtnExcluir" type="Button" parent="VBox/ActionRow"]
+text = "Excluir"
+disabled = true
+custom_minimum_size = Vector2(150, 40)
+modulate = Color(1, 0.6, 0.6, 1)
+
 [node name="BtnRow" type="HBoxContainer" parent="VBox"]
 
 [node name="BtnVoltar" type="Button" parent="VBox/BtnRow"]
@@ -77,6 +92,50 @@ size_flags_horizontal = 3
 [node name="BtnConfirmar" type="Button" parent="CreatePanel/VBox/BtnRow"]
 text = "Criar"
 
+[node name="DeletePanel" type="Panel" parent="."]
+anchor_left = 0.25
+anchor_top = 0.3
+anchor_right = 0.75
+anchor_bottom = 0.7
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="DeletePanel"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="DeletePanel/VBox"]
+text = "Excluir personagem"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+modulate = Color(1, 0.5, 0.5, 1)
+
+[node name="Msg" type="Label" parent="DeletePanel/VBox"]
+text = ""
+horizontal_alignment = 1
+autowrap_mode = 3
+size_flags_vertical = 3
+
+[node name="BtnRow" type="HBoxContainer" parent="DeletePanel/VBox"]
+theme_override_constants/separation = 10
+
+[node name="BtnCancelar" type="Button" parent="DeletePanel/VBox/BtnRow"]
+text = "Cancelar"
+size_flags_horizontal = 3
+
+[node name="BtnConfirmar" type="Button" parent="DeletePanel/VBox/BtnRow"]
+text = "Excluir definitivamente"
+size_flags_horizontal = 3
+modulate = Color(1, 0.5, 0.5, 1)
+
+[connection signal="pressed" from="VBox/ActionRow/BtnSelecionar" to="." method="_on_select_pressed"]
+[connection signal="pressed" from="VBox/ActionRow/BtnExcluir" to="." method="_on_delete_pressed"]
+[connection signal="pressed" from="DeletePanel/VBox/BtnRow/BtnCancelar" to="." method="_on_cancel_delete_pressed"]
+[connection signal="pressed" from="DeletePanel/VBox/BtnRow/BtnConfirmar" to="." method="_on_confirm_delete_pressed"]
 [connection signal="pressed" from="VBox/BtnRow/BtnVoltar" to="." method="_on_back_pressed"]
 [connection signal="pressed" from="VBox/BtnRow/BtnCriar" to="." method="_on_create_pressed"]
 [connection signal="pressed" from="CreatePanel/VBox/BtnRow/BtnCancelar" to="." method="_on_cancel_create_pressed"]

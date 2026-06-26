@@ -38,6 +38,7 @@ var _dead        : bool    = false       # morto? (bloqueia ações até renasce
 var _death_layer : CanvasLayer = null
 var _death_xp_lbl          = null
 var _respawn_btn           = null
+var _menu_layer  : CanvasLayer = null    # menu do Esc (voltar à seleção / deslogar)
 var _dest_cell   : Vector2i = Vector2i(0x7fffffff, 0x7fffffff)  # última célula de destino (evita recalcular no drag)
 var _mob_dest    : Dictionary = {}        # instance_id -> Vector3 alvo (suavização de movimento)
 var _remote_dest : Dictionary = {}        # character_id -> Vector3 alvo (suavização de movimento)
@@ -74,6 +75,7 @@ func _ready() -> void:
 	_ensure_local_player(px, py)
 
 	_build_death_ui()
+	_build_menu_ui()
 
 	WsClient.message_received.connect(_on_ws_message)
 	WsClient.ws_disconnected.connect(_on_ws_disconnected)
@@ -163,6 +165,10 @@ func _ground_at_mouse() -> Vector3:
 # ── Input ──────────────────────────────────────────────────────────────────────
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+		_toggle_menu()
+		get_viewport().set_input_as_handled()
+		return
 	if _dead:
 		return   # morto: nenhuma ação até renascer
 	if event is InputEventMouseButton:
@@ -475,6 +481,71 @@ func _handle_damage(payload: Dictionary) -> void:
 func _handle_stats_update(payload: Dictionary) -> void:
 	CharacterData.apply_damage(payload.get("hp", CharacterData.hp), payload.get("hp_max", CharacterData.max_hp))
 	CharacterData.apply_sp(payload.get("sp", CharacterData.sp), payload.get("sp_max", CharacterData.max_sp))
+
+# ── Menu (Esc) ──────────────────────────────────────────────────────────────────
+
+func _build_menu_ui() -> void:
+	_menu_layer = CanvasLayer.new()
+	_menu_layer.layer = 101
+	add_child(_menu_layer)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0.0, 0.0, 0.0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_menu_layer.add_child(dim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_menu_layer.add_child(center)
+
+	var panel := PanelContainer.new()
+	center.add_child(panel)
+
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 10)
+	panel.add_child(vb)
+
+	var title := Label.new()
+	title.text = "Menu"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 22)
+	vb.add_child(title)
+
+	var btn_resume := Button.new()
+	btn_resume.text = "Continuar"
+	btn_resume.custom_minimum_size = Vector2(260, 38)
+	btn_resume.pressed.connect(_toggle_menu)
+	vb.add_child(btn_resume)
+
+	var btn_select := Button.new()
+	btn_select.text = "Voltar à seleção de personagem"
+	btn_select.custom_minimum_size = Vector2(260, 38)
+	btn_select.pressed.connect(_on_back_to_select)
+	vb.add_child(btn_select)
+
+	var btn_logout := Button.new()
+	btn_logout.text = "Deslogar"
+	btn_logout.custom_minimum_size = Vector2(260, 38)
+	btn_logout.modulate = Color(1.0, 0.7, 0.7)
+	btn_logout.pressed.connect(_on_logout)
+	vb.add_child(btn_logout)
+
+	_menu_layer.visible = false
+
+func _toggle_menu() -> void:
+	if _menu_layer != null:
+		_menu_layer.visible = not _menu_layer.visible
+
+func _on_back_to_select() -> void:
+	WsClient.disconnect_ws()
+	get_tree().change_scene_to_file("res://scenes/character_select.tscn")
+
+func _on_logout() -> void:
+	WsClient.disconnect_ws()
+	GameState.clear()
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 # ── Morte / Renascimento ────────────────────────────────────────────────────────
 
