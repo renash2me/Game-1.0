@@ -27,6 +27,7 @@ var _cam_ortho   : float   = CAM_ORTHO_DEF
 var _move_target : Vector3 = Vector3.ZERO
 var _moving      : bool    = false
 var _left_held   : bool    = false
+var _drag_to_move : bool   = false   # o hold atual deve arrastar-mover? (false se clicou num mob)
 var _send_timer  : float   = 0.0
 var _last_sent   : Vector3 = Vector3.ZERO
 var _players     : Dictionary = {}
@@ -162,19 +163,24 @@ func _unhandled_input(event: InputEvent) -> void:
 						return
 					_left_held = true
 					var target := _ground_at_mouse()
-					if Input.is_action_pressed("attack"):
-						_try_attack_at(target)
+					# Estilo Ragnarok: clicar num monstro ataca; no chão, anda.
+					var mob_id := _mob_at(target)
+					if mob_id != "":
+						_drag_to_move = false
+						_attack_mob(mob_id)
 					else:
-						_move_target = target
-						_moving = true
+						_drag_to_move = true
+						_move_target  = target
+						_moving       = true
 						_spawn_click_marker(target)
 				else:
-					_left_held = false
+					_left_held    = false
+					_drag_to_move = false
 			MOUSE_BUTTON_RIGHT:
 				if event.pressed:
 					_try_pickup_at(_ground_at_mouse())
 	elif event is InputEventMouseMotion:
-		if _left_held and not _inv_ui.visible and not Input.is_action_pressed("attack"):
+		if _left_held and _drag_to_move and not _inv_ui.visible:
 			_move_target = _ground_at_mouse()
 			_moving = true
 	elif event.is_action_pressed("inventory"):
@@ -235,9 +241,9 @@ func _broadcast_move(pos: Vector3) -> void:
 
 # ── Combate ────────────────────────────────────────────────────────────────────
 
-func _try_attack_at(ground_pos: Vector3) -> void:
+func _mob_at(ground_pos: Vector3) -> String:
 	var best_id   := ""
-	var best_dist := 3.5  # units 3D
+	var best_dist := 0.7  # ~28 server units: raio de clique sobre o monstro
 	for iid in _mobs:
 		var mn = _mobs[iid]
 		var d : float = Vector2(mn.position.x - ground_pos.x,
@@ -245,8 +251,10 @@ func _try_attack_at(ground_pos: Vector3) -> void:
 		if d < best_dist:
 			best_dist = d
 			best_id   = iid
-	if best_id != "":
-		WsClient.send({"type": "ATTACK", "payload": {"target_id": best_id, "attack_type": "melee"}})
+	return best_id
+
+func _attack_mob(mob_id: String) -> void:
+	WsClient.send({"type": "ATTACK", "payload": {"target_id": mob_id, "attack_type": "melee"}})
 
 func _try_pickup_at(ground_pos: Vector3) -> void:
 	var best_id   := ""
