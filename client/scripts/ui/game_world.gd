@@ -32,6 +32,7 @@ var _left_held   : bool    = false
 var _drag_to_move : bool   = false       # o hold atual deve arrastar-mover? (false se clicou num mob)
 var _target_mob  : String  = ""          # mob travado para auto-attack (persegue e ataca sozinho)
 var _attack_cd   : float   = 0.0         # tempo restante até o próximo auto-ataque
+var _attack_interval : float = ATTACK_INTERVAL   # intervalo entre ataques (derivado do aspd)
 var _dest_cell   : Vector2i = Vector2i(0x7fffffff, 0x7fffffff)  # última célula de destino (evita recalcular no drag)
 var _mob_dest    : Dictionary = {}        # instance_id -> Vector3 alvo (suavização de movimento)
 var _remote_dest : Dictionary = {}        # character_id -> Vector3 alvo (suavização de movimento)
@@ -44,6 +45,12 @@ var _drops       : Dictionary = {}
 func _ready() -> void:
 	_local_name = str(GameState.character.get("name", ""))
 	CharacterData.apply_from_response(GameState.character)
+
+	# Velocidade de ataque vem das fórmulas (campo derived.aspd)
+	var derived = GameState.character.get("derived", {})
+	if derived is Dictionary:
+		var aspd : float = derived.get("aspd", 1.0)
+		_attack_interval = 1.0 / max(0.2, aspd)
 
 	_setup_camera()
 	_setup_world()
@@ -219,7 +226,7 @@ func _process(delta: float) -> void:
 				_path.clear()                       # no alcance: para e ataca
 				_attack_cd -= delta
 				if _attack_cd <= 0.0:
-					_attack_cd = ATTACK_INTERVAL
+					_attack_cd = _attack_interval
 					_attack_mob(_target_mob)
 			else:
 				if _path.is_empty():

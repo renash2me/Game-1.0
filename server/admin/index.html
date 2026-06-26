@@ -121,6 +121,7 @@
     <a href="#" data-cat="cards"><span class="icon">🃏</span>Cards</a>
     <a href="#" data-cat="skills"><span class="icon">✨</span>Skills</a>
     <a href="#" data-cat="quests"><span class="icon">📜</span>Quests</a>
+    <a href="#" data-cat="formulas"><span class="icon">🧮</span>Fórmulas</a>
   </nav>
 </aside>
 
@@ -292,6 +293,10 @@ function cardContent(cat, r) {
     ${r.slot ? `<span>🎴 Slot: ${r.slot}</span>` : ''}
     ${r.effect ? `<span>${JSON.stringify(r.effect)}</span>` : ''}
   `};
+  if (cat === 'formulas') return { meta: `
+    <span><code>${(r.expr||'').replace(/</g,'&lt;')}</code></span>
+    ${r.description ? `<span style="color:#94a3b8">${r.description}</span>` : ''}
+  `};
   return { meta: `<span>${JSON.stringify(r).slice(0,80)}…</span>` };
 }
 
@@ -353,6 +358,7 @@ function buildForm(cat, data) {
   if (cat === 'items') return buildItemForm(d);
   if (cat === 'monsters') return buildMonsterForm(d);
   if (cat === 'maps') return buildMapForm(d);
+  if (cat === 'formulas') return buildFormulaForm(d);
   return `<div class="form-grid">
     ${field('f_id','ID',d.id)}
     <div></div>
@@ -421,6 +427,23 @@ function buildMonsterForm(d) {
       <label>Spawns — onde este bicho nasce (mapa, quantidade, respawn, área)</label>
       <div id="spawns-list" class="drops-list"></div>
       <button class="btn-ghost btn-sm" style="margin-top:8px;width:fit-content" onclick="addSpawn()">+ Spawn</button>
+    </div>
+  </div>`;
+}
+
+function buildFormulaForm(d) {
+  return `<div class="form-grid">
+    ${field('f_id','ID *',d.id)}
+    ${field('f_name','Nome *',d.name)}
+    ${field('f_expr','Fórmula (expressão)',d.expr,'textarea')}
+    ${field('f_description','Descrição',d.description||'')}
+    <div class="field full"><label>Ajuda</label>
+      <div style="font-size:12px;color:#94a3b8;line-height:1.6">
+        Variáveis: <code>level str agi vit int dex luk</code><br>
+        Funções: <code>min max abs round floor ceil sqrt pow</code><br>
+        Operadores: <code>+ - * / // % **</code> e ternário <code>a if cond else b</code><br>
+        Ex.: <code>40 + level * 10 + vit * 8</code>
+      </div>
     </div>
   </div>`;
 }
@@ -506,6 +529,7 @@ function collectForm(cat) {
   if (cat==='items') return collectItem();
   if (cat==='monsters') return collectMonster();
   if (cat==='maps') return collectMap();
+  if (cat==='formulas') return collectFormula();
   try { return JSON.parse(v('f_json')); } catch { throw new Error('JSON inválido'); }
 }
 
@@ -530,6 +554,10 @@ function collectMonster() {
     ai_type:v('f_ai_type'), size:v('f_size'), element:v('f_element'), race:v('f_race'),
     drops: dropsData.filter(d=>d.item_id),
     spawns: spawnsData.filter(s=>s.map_id) });
+}
+
+function collectFormula() {
+  return omit({ id:v('f_id'), name:v('f_name'), expr:v('f_expr'), description:v('f_description') });
 }
 
 function collectMap() {

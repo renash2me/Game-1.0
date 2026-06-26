@@ -13,23 +13,27 @@ class CombatStats:
 
 def stats_from_character(char: dict) -> CombatStats:
     """
-    Calcula CombatStats a partir de um dict de atributos do personagem.
+    Calcula CombatStats a partir de um dict de atributos do personagem,
+    usando as fórmulas configuráveis (data/formulas.json, editáveis no admin).
     `char` pode vir de um ORM model serializado ou de cache Redis.
     """
-    level = int(char.get("level", 1))
-    str_val = int(char.get("str_stat", 1))
-    agi = int(char.get("agi", 1))
-    vit = int(char.get("vit", 1))
-    dex = int(char.get("dex", 1))
-    luk = int(char.get("luk", 1))
+    from app.systems.formulas import derive_stats
 
-    atk = str_val + (str_val // 10) ** 2  # bônus STR quadrático como no RO
+    d = derive_stats(
+        level=int(char.get("level", 1)),
+        str_=int(char.get("str_stat", 1)),
+        agi=int(char.get("agi", 1)),
+        vit=int(char.get("vit", 1)),
+        int_=int(char.get("int_stat", 1)),
+        dex=int(char.get("dex", 1)),
+        luk=int(char.get("luk", 1)),
+    )
     return CombatStats(
-        atk=atk,
-        def_=vit // 2,
-        hit=dex + level,
-        flee=agi + level,
-        crit=luk * 30,  # 30/10000 por LUK = 0.3% por ponto
+        atk=int(d.get("atk", 1)),
+        def_=int(d.get("def", 0)),
+        hit=int(d.get("hit", 1)),
+        flee=int(d.get("flee", 1)),
+        crit=int(d.get("crit", 0)),
     )
 
 

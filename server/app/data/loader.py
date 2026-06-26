@@ -14,6 +14,7 @@ _maps: dict = {}
 _skills: dict = {}
 _quests: dict = {}
 _classes: dict = {}
+_formulas: dict = {}
 
 
 def _load(filename: str) -> list:
@@ -23,7 +24,7 @@ def _load(filename: str) -> list:
 
 
 def load_all() -> None:
-    global _items, _cards, _monsters, _maps, _skills, _quests, _classes
+    global _items, _cards, _monsters, _maps, _skills, _quests, _classes, _formulas
 
     _items = {entry["id"]: entry for entry in _load("items.json")}
     _cards = {entry["id"]: entry for entry in _load("cards.json")}
@@ -32,6 +33,7 @@ def load_all() -> None:
     _skills = {entry["id"]: entry for entry in _load("skills.json")}
     _quests = {entry["id"]: entry for entry in _load("quests.json")}
     _classes = {entry["id"]: entry for entry in _load("classes.json")}
+    _formulas = {entry["id"]: entry for entry in _load("formulas.json")}
 
     logger.info(
         "catalogs_loaded",
@@ -42,6 +44,7 @@ def load_all() -> None:
         skills=len(_skills),
         quests=len(_quests),
         classes=len(_classes),
+        formulas=len(_formulas),
     )
 
 
@@ -52,3 +55,4 @@ def get_maps() -> dict: return _maps
 def get_skills() -> dict: return _skills
 def get_quests() -> dict: return _quests
 def get_classes() -> dict: return _classes
+def get_formulas() -> dict: return _formulas

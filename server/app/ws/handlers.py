@@ -44,10 +44,14 @@ async def handle_auth(websocket: WebSocketServerProtocol, raw: str) -> uuid.UUID
             )
         )
         character = result.scalar_one_or_none()
-
-    if character is None:
-        await websocket.close(4004, "Personagem nao encontrado")
-        return None
+        if character is None:
+            await websocket.close(4004, "Personagem nao encontrado")
+            return None
+        # Recalcula HP/SP máx pelas fórmulas (aplica alterações feitas no admin)
+        from app.systems.formulas import apply_derived
+        apply_derived(character)
+        await session.commit()
+        await session.refresh(character)
 
     # Guarda stats em cache Redis para o loop de IA usar
     await _cache_char_stats(character)
@@ -253,7 +257,9 @@ async def _handle_attack(manager: ConnectionManager, character_id: uuid.UUID, pa
 
     if new_hp <= 0:
         await _handle_mob_death(
-            manager, r, character_id, instance_id, mob_id, mob_data, map_id, char_raw, attack_type
+            manager, r, character_id, instance_id, mob_id, mob_data, map_id, char_raw,
+            mob_x=float(mob_raw.get("x", 0)), mob_y=float(mob_raw.get("y", 0)),
+            attack_type=attack_type,
         )
     else:
         await r.hset(f"mob:{instance_id}", "hp", str(new_hp))
@@ -268,6 +274,8 @@ async def _handle_mob_death(
     mob_data: dict,
     map_id: str,
     char_raw: dict,
+    mob_x: float = 0.0,
+    mob_y: float = 0.0,
     attack_type: str = "melee",
 ) -> None:
     from app.systems.drop_system import roll_drops
@@ -279,9 +287,7 @@ async def _handle_mob_death(
     await r.srem(f"map_mobs:{map_id}", instance_id)
     await r.delete(f"mob:{instance_id}")
 
-    # Drops
-    mob_x = float(mob_data.get("x", 0))
-    mob_y = float(mob_data.get("y", 0))
+    # Drops — caem na última posição do mob (mob_x/mob_y vêm do chamador)
     drops = roll_drops(mob_data)
     drop_dicts = await save_drops_to_redis(map_id, drops, mob_x, mob_y, mob_id)
 

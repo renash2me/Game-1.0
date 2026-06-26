@@ -19,6 +19,7 @@ _FILES = {
     "cards":    "cards.json",
     "skills":   "skills.json",
     "quests":   "quests.json",
+    "formulas": "formulas.json",
 }
 
 

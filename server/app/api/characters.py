@@ -9,6 +9,7 @@ from app.data import loader
 from app.database import get_session
 from app.models.character import Character
 from app.models.player import Player
+from app.systems.formulas import apply_derived
 from app.schemas.character import (
     AllocateSkillRequest,
     AllocateStatsRequest,
@@ -18,14 +19,6 @@ from app.schemas.character import (
 )
 
 router = APIRouter(prefix="/api/characters", tags=["characters"])
-
-
-def _hp_max(vit: int, level: int, hp_per_level: int) -> int:
-    return hp_per_level * level + vit * 10
-
-
-def _sp_max(int_stat: int, level: int, sp_per_level: int) -> int:
-    return sp_per_level * level + int_stat * 6
 
 
 def _check_class_requirements(target_class: dict, character: Character) -> None:
@@ -95,6 +88,10 @@ async def create_character(
 
     character = Character(player_id=player.id, name=body.name, class_id=body.class_id, stat_points=10)
     session.add(character)
+    await session.flush()        # aplica defaults (level=1, atributos=1) antes de derivar
+    apply_derived(character)
+    character.hp = character.hp_max   # nasce com vida/mana cheias
+    character.sp = character.sp_max
     await session.commit()
     await session.refresh(character)
     return character
@@ -221,10 +218,7 @@ async def class_change(
 
     character.class_id = target["id"]
     character.class_tier = target["tier"]
-    character.hp_max = _hp_max(character.vit, character.level, target["hp_per_level"])
-    character.sp_max = _sp_max(character.int_stat, character.level, target["sp_per_level"])
-    character.hp = min(character.hp, character.hp_max)
-    character.sp = min(character.sp, character.sp_max)
+    apply_derived(character)
 
     await session.commit()
     await session.refresh(character)
@@ -262,10 +256,7 @@ async def allocate_stats(
     character.luk += body.luk
     character.stat_points -= total
 
-    classes = loader.get_classes()
-    cls = classes.get(character.class_id, {})
-    character.hp_max = _hp_max(character.vit, character.level, cls.get("hp_per_level", 5))
-    character.sp_max = _sp_max(character.int_stat, character.level, cls.get("sp_per_level", 2))
+    apply_derived(character)
 
     await session.commit()
     await session.refresh(character)

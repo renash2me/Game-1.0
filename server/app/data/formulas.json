@@ -1,0 +1,68 @@
+[
+  {
+    "id": "max_hp",
+    "name": "HP Máximo",
+    "expr": "40 + level * 10 + vit * 8",
+    "description": "Vida máxima. Depende de VIT e level."
+  },
+  {
+    "id": "max_sp",
+    "name": "SP Máximo",
+    "expr": "11 + level * 3 + int * 6",
+    "description": "Mana máxima. Depende de INT e level."
+  },
+  {
+    "id": "atk",
+    "name": "Ataque (corpo a corpo)",
+    "expr": "str + floor(str / 10) ** 2 + floor(dex / 5) + floor(level / 4)",
+    "description": "Dano físico base de ataque corpo a corpo."
+  },
+  {
+    "id": "ranged_atk",
+    "name": "Ataque à distância",
+    "expr": "dex + floor(dex / 10) ** 2 + floor(str / 5) + floor(level / 4)",
+    "description": "Dano físico base de ataque à distância."
+  },
+  {
+    "id": "matk",
+    "name": "Ataque mágico",
+    "expr": "int + floor(int / 7) ** 2 + floor(dex / 5)",
+    "description": "Dano mágico base."
+  },
+  {
+    "id": "hit",
+    "name": "Chance de acerto (Hit)",
+    "expr": "level + dex + floor(luk / 3)",
+    "description": "Precisão. Comparada à esquiva (flee) do alvo."
+  },
+  {
+    "id": "flee",
+    "name": "Esquiva (Flee)",
+    "expr": "level + agi + floor(luk / 5)",
+    "description": "Evasão. Comparada ao hit do atacante."
+  },
+  {
+    "id": "crit",
+    "name": "Crítico (0-10000 = 0-100%)",
+    "expr": "100 + luk * 30",
+    "description": "Chance de acerto crítico em milésimos de porcento (500 = 5%)."
+  },
+  {
+    "id": "def",
+    "name": "Defesa física",
+    "expr": "floor(vit / 2)",
+    "description": "Redução de dano físico."
+  },
+  {
+    "id": "mdef",
+    "name": "Defesa mágica",
+    "expr": "floor(int / 2) + floor(vit / 5)",
+    "description": "Redução de dano mágico."
+  },
+  {
+    "id": "aspd",
+    "name": "Velocidade de ataque (ataques/seg)",
+    "expr": "1.0 + agi * 0.03 + dex * 0.01",
+    "description": "Ataques por segundo. Define o intervalo do auto-attack."
+  }
+]

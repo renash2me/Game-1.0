@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, computed_field, field_validator
 
 
 class CharacterCreate(BaseModel):
@@ -87,5 +87,15 @@ class CharacterResponse(BaseModel):
     zeny: int
     skills_data: dict
     created_at: datetime
+
+    @computed_field
+    @property
+    def derived(self) -> dict:
+        """Atributos derivados das fórmulas (HP/SP máx, atk, hit, crit, aspd, ...)."""
+        from app.systems.formulas import derive_stats
+        return derive_stats(
+            level=self.level, str_=self.str_stat, agi=self.agi,
+            vit=self.vit, int_=self.int_stat, dex=self.dex, luk=self.luk,
+        )
 
     model_config = {"from_attributes": True}
