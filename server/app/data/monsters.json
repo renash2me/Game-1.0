@@ -47,9 +47,7 @@
     "element": "earth",
     "race": "insect",
     "tags": [],
-    "spawns": [
-      {"map_id": "starter_village", "count": 1, "respawn_seconds": 30, "area": {"x1": 90.0, "y1": 70.0, "x2": 130.0, "y2": 110.0}}
-    ],
+    "spawns": [],
     "drops": [
       {"item_id": "fluff",      "chance": 0.6000},
       {"item_id": "chrysalis",  "chance": 0.0500},

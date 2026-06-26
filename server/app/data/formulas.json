@@ -96,6 +96,12 @@
     "description": "MaxSP/100 + INT/6. Quantidade restaurada por tick de regen."
   },
   {
+    "id": "death_xp_penalty",
+    "name": "Penalidade de XP ao morrer (%)",
+    "expr": "5",
+    "description": "Porcentagem do XP necessário para o próximo level que se perde ao morrer."
+  },
+  {
     "id": "aspd",
     "name": "Velocidade de ataque (ataques/seg)",
     "expr": "1.0 + agi * 0.03 + dex * 0.01",

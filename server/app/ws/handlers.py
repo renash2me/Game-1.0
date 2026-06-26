@@ -13,6 +13,9 @@ logger = structlog.get_logger()
 
 CHAT_CHANNELS = {"global", "local", "map", "party", "guild", "whisper"}
 
+# Ponto de renascimento seguro (última cidade segura). Como só há 1 mapa, é fixo.
+SAFE_RESPAWN = ("starter_village", 0.0, 0.0)
+
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -50,6 +53,8 @@ async def handle_auth(websocket: WebSocketServerProtocol, raw: str) -> uuid.UUID
         # Recalcula HP/SP máx pelas fórmulas (aplica alterações feitas no admin)
         from app.systems.formulas import apply_derived
         apply_derived(character)
+        if character.hp <= 0:           # nunca entra no jogo morto
+            character.hp = character.hp_max
         await session.commit()
         await session.refresh(character)
 
@@ -154,6 +159,8 @@ async def dispatch(manager: ConnectionManager, character_id: uuid.UUID, raw: str
             await _handle_chat(manager, character_id, payload)
         case "SIT":
             await _handle_sit(manager, character_id, payload)
+        case "RESPAWN":
+            await _handle_respawn(manager, character_id, payload)
         case _:
             logger.debug("ws_unknown_type", type=msg_type)
 
@@ -416,6 +423,51 @@ async def _handle_sit(manager: ConnectionManager, character_id: uuid.UUID, paylo
     r = get_redis()
     sitting = "1" if payload.get("sitting") else "0"
     await r.hset(f"char_stats:{character_id}", "sitting", sitting)
+
+
+# ── RESPAWN ──────────────────────────────────────────────────────────────────
+
+async def _handle_respawn(manager: ConnectionManager, character_id: uuid.UUID, payload: dict) -> None:
+    """Renasce na cidade segura com HP/SP cheios (acionado pelo botão de morte)."""
+    from app.redis_client import get_redis
+    r = get_redis()
+
+    c = await r.hgetall(f"char_stats:{character_id}")
+    if not c:
+        return
+
+    hp_max = int(c.get("hp_max", 1))
+    sp_max = int(c.get("sp_max", 1))
+    map_id, x, y = SAFE_RESPAWN
+
+    await r.hset(f"char_stats:{character_id}", mapping={
+        "hp": str(hp_max), "sp": str(sp_max), "dead": "0",
+    })
+    await r.hset(f"pos:{character_id}", mapping={"map_id": map_id, "x": str(x), "y": str(y)})
+
+    # Garante que o servidor sabe que ele está no mapa seguro
+    old_map = manager.get_map(character_id)
+    if old_map != map_id:
+        if old_map:
+            await r.srem(f"online_players:{old_map}", str(character_id))
+        manager.join_map(character_id, map_id)
+        await r.sadd(f"online_players:{map_id}", str(character_id))
+        await _cache_char_map(character_id, map_id, r)
+
+    await send_to(manager, character_id, {
+        "type": "RESPAWN_OK",
+        "payload": {
+            "map_id": map_id, "x": x, "y": y,
+            "hp": hp_max, "hp_max": hp_max, "sp": sp_max, "sp_max": sp_max,
+        },
+        "timestamp": _now(),
+    })
+    # Avisa os outros jogadores que ele reapareceu no ponto de renascimento
+    await broadcast_map(manager, map_id, {
+        "type": "PLAYER_MOVE",
+        "payload": {"character_id": str(character_id), "x": x, "y": y, "map_id": map_id},
+        "timestamp": _now(),
+    }, exclude=character_id)
 
 
 # ── CHAT ─────────────────────────────────────────────────────────────────────

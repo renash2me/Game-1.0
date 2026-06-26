@@ -34,6 +34,10 @@ var _target_mob  : String  = ""          # mob travado para auto-attack (persegu
 var _attack_cd   : float   = 0.0         # tempo restante até o próximo auto-ataque
 var _attack_interval : float = ATTACK_INTERVAL   # intervalo entre ataques (derivado do aspd)
 var _sitting     : bool    = false       # sentado? (regenera HP/SP mais rápido — tecla Insert)
+var _dead        : bool    = false       # morto? (bloqueia ações até renascer)
+var _death_layer : CanvasLayer = null
+var _death_xp_lbl          = null
+var _respawn_btn           = null
 var _dest_cell   : Vector2i = Vector2i(0x7fffffff, 0x7fffffff)  # última célula de destino (evita recalcular no drag)
 var _mob_dest    : Dictionary = {}        # instance_id -> Vector3 alvo (suavização de movimento)
 var _remote_dest : Dictionary = {}        # character_id -> Vector3 alvo (suavização de movimento)
@@ -68,6 +72,8 @@ func _ready() -> void:
 	var px : float = GameState.character.get("pos_x", 0.0)
 	var py : float = GameState.character.get("pos_y", 0.0)
 	_ensure_local_player(px, py)
+
+	_build_death_ui()
 
 	WsClient.message_received.connect(_on_ws_message)
 	WsClient.ws_disconnected.connect(_on_ws_disconnected)
@@ -157,6 +163,8 @@ func _ground_at_mouse() -> Vector3:
 # ── Input ──────────────────────────────────────────────────────────────────────
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _dead:
+		return   # morto: nenhuma ação até renascer
 	if event is InputEventMouseButton:
 		match event.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
@@ -231,6 +239,10 @@ func _process(delta: float) -> void:
 	else:
 		if _coords_lbl != null:
 			_coords_lbl.text = "X: --  Y: --"
+
+	if _dead:
+		_smooth_others(delta)   # morto: sem movimento/ataque, mundo continua
+		return
 
 	# Auto-attack: persegue e ataca o mob travado (estilo Ragnarok)
 	if _target_mob != "" and local_node != null:
@@ -371,6 +383,8 @@ func _on_ws_message(type: String, payload: Dictionary) -> void:
 		"STATS_UPDATE": _handle_stats_update(payload)
 		"XP_GAIN":      _handle_xp_gain(payload)
 		"LEVEL_UP":     _handle_level_up(payload)
+		"PLAYER_DEATH": _handle_player_death(payload)
+		"RESPAWN_OK":   _handle_respawn_ok(payload)
 		"MAP_CHANGE":   _handle_map_change(payload)
 
 func _handle_map_players(payload: Dictionary) -> void:
@@ -461,6 +475,82 @@ func _handle_damage(payload: Dictionary) -> void:
 func _handle_stats_update(payload: Dictionary) -> void:
 	CharacterData.apply_damage(payload.get("hp", CharacterData.hp), payload.get("hp_max", CharacterData.max_hp))
 	CharacterData.apply_sp(payload.get("sp", CharacterData.sp), payload.get("sp_max", CharacterData.max_sp))
+
+# ── Morte / Renascimento ────────────────────────────────────────────────────────
+
+func _build_death_ui() -> void:
+	_death_layer = CanvasLayer.new()
+	_death_layer.layer = 100
+	add_child(_death_layer)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0.0, 0.0, 0.0, 0.65)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_death_layer.add_child(dim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_death_layer.add_child(center)
+
+	var panel := PanelContainer.new()
+	center.add_child(panel)
+
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 14)
+	panel.add_child(vb)
+
+	var title := Label.new()
+	title.text = "Você morreu"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 28)
+	title.modulate = Color(1.0, 0.4, 0.4)
+	vb.add_child(title)
+
+	_death_xp_lbl = Label.new()
+	_death_xp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_death_xp_lbl.add_theme_font_size_override("font_size", 14)
+	vb.add_child(_death_xp_lbl)
+
+	_respawn_btn = Button.new()
+	_respawn_btn.text = "Voltar ao ponto de início"
+	_respawn_btn.custom_minimum_size = Vector2(0, 40)
+	_respawn_btn.pressed.connect(_on_respawn_pressed)
+	vb.add_child(_respawn_btn)
+
+	_death_layer.visible = false
+
+func _handle_player_death(payload: Dictionary) -> void:
+	_dead = true
+	_target_mob = ""
+	_path.clear()
+	_sitting = false
+	var lost : int = payload.get("xp_lost", 0)
+	if _death_xp_lbl != null:
+		_death_xp_lbl.text = "Você perdeu %d de XP." % lost
+	if _respawn_btn != null:
+		_respawn_btn.disabled = false
+	if _death_layer != null:
+		_death_layer.visible = true
+
+func _on_respawn_pressed() -> void:
+	if _respawn_btn != null:
+		_respawn_btn.disabled = true   # evita clique duplo até o servidor responder
+	WsClient.send({"type": "RESPAWN", "payload": {}})
+
+func _handle_respawn_ok(payload: Dictionary) -> void:
+	_dead = false
+	if _death_layer != null:
+		_death_layer.visible = false
+	_path.clear()
+	_target_mob = ""
+	_dest_cell = Vector2i(0x7fffffff, 0x7fffffff)
+	var node := _get_local_player_node()
+	if node != null:
+		node.position = _to_3d(payload.get("x", 0.0), payload.get("y", 0.0))
+	CharacterData.apply_damage(payload.get("hp", CharacterData.max_hp), payload.get("hp_max", CharacterData.max_hp))
+	CharacterData.apply_sp(payload.get("sp", CharacterData.max_sp), payload.get("sp_max", CharacterData.max_sp))
 
 func _handle_xp_gain(payload: Dictionary) -> void:
 	CharacterData.apply_xp(

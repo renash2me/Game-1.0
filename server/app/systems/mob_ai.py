@@ -209,6 +209,9 @@ async def _mob_attack(
     char_raw = await r.hgetall(f"char_stats:{target_id}")
     if not char_raw:
         return
+    # Não ataca um personagem já morto (evita repetir a penalidade de morte)
+    if char_raw.get("dead") == "1" or int(char_raw.get("hp", 1)) <= 0:
+        return
 
     mob_stats = stats_from_mob(mob_data)
     char_stats = stats_from_character(char_raw)
@@ -239,6 +242,48 @@ async def _mob_attack(
     await broadcast_map(manager, map_id, msg)
 
     logger.debug("mob_attacked", mob=mob_data["id"], target=target_id, dmg=damage)
+
+    if new_hp <= 0:
+        await _apply_death(target_id, char_raw, r)
+
+
+async def _apply_death(target_id: str, char_raw: dict, r) -> None:
+    """Personagem morreu: aplica penalidade de XP e marca como morto.
+    O renascimento (posição/HP cheio) acontece quando o cliente pede RESPAWN."""
+    import uuid as _uuid
+
+    from app.systems.formulas import derive_stats
+    from app.ws.broadcaster import send_to
+    from app.ws.manager import manager
+
+    if char_raw.get("dead") == "1":
+        return
+
+    d = derive_stats(
+        level=int(char_raw.get("level", 1)), str_=int(char_raw.get("str_stat", 1)),
+        agi=int(char_raw.get("agi", 1)), vit=int(char_raw.get("vit", 1)),
+        int_=int(char_raw.get("int_stat", 1)), dex=int(char_raw.get("dex", 1)),
+        luk=int(char_raw.get("luk", 1)),
+    )
+    pct = float(d.get("death_xp_penalty", 0.0))
+    xp = int(char_raw.get("xp", 0))
+    xp_to_next = int(char_raw.get("xp_to_next", 1))
+    xp_loss = int(xp_to_next * pct / 100.0)
+    new_xp = max(0, xp - xp_loss)
+
+    await r.hset(f"char_stats:{target_id}", mapping={"hp": "0", "dead": "1", "xp": str(new_xp)})
+    try:
+        from app.ws.handlers import _persist_char_to_db
+        await _persist_char_to_db(_uuid.UUID(target_id), {"xp": str(new_xp)})
+    except Exception:
+        logger.exception("death_persist_error", target=target_id)
+
+    await send_to(manager, _uuid.UUID(target_id), {
+        "type": "PLAYER_DEATH",
+        "payload": {"xp_lost": xp_loss, "xp": new_xp, "xp_to_next": xp_to_next},
+        "timestamp": int(time.time() * 1000),
+    })
+    logger.info("player_died", character_id=target_id, xp_lost=xp_loss)
 
 
 def _dist(x1: float, y1: float, x2: float, y2: float) -> float:
