@@ -21,6 +21,29 @@ from app.schemas.character import (
 router = APIRouter(prefix="/api/characters", tags=["characters"])
 
 
+async def _sync_redis_stats(character) -> None:
+    """Sincroniza o cache char_stats no Redis (combat e regen leem de lá).
+    Sem isso, alocar atributos atualiza só o banco e o cache fica defasado —
+    o loop de regen acabaria revertendo o HP/SP máx exibido no cliente."""
+    try:
+        from app.redis_client import get_redis
+        r = get_redis()
+        if not await r.exists(f"char_stats:{character.id}"):
+            return
+        await r.hset(f"char_stats:{character.id}", mapping={
+            "level": str(character.level),
+            "str_stat": str(character.str_stat), "agi": str(character.agi),
+            "vit": str(character.vit), "int_stat": str(character.int_stat),
+            "dex": str(character.dex), "luk": str(character.luk),
+            "stat_points": str(character.stat_points),
+            "skill_points": str(character.skill_points),
+            "hp": str(character.hp), "hp_max": str(character.hp_max),
+            "sp": str(character.sp), "sp_max": str(character.sp_max),
+        })
+    except Exception:
+        pass
+
+
 def _check_class_requirements(target_class: dict, character: Character) -> None:
     req = target_class.get("requirements", {})
 
@@ -255,6 +278,7 @@ async def class_change(
 
     await session.commit()
     await session.refresh(character)
+    await _sync_redis_stats(character)
     return character
 
 
@@ -293,6 +317,7 @@ async def allocate_stats(
 
     await session.commit()
     await session.refresh(character)
+    await _sync_redis_stats(character)
     return character
 
 

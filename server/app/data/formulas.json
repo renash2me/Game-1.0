@@ -14,13 +14,13 @@
   {
     "id": "max_hp",
     "name": "HP Máximo",
-    "expr": "floor(base_hp * (1 + vit / 100))",
-    "description": "Base HP x (1 + VIT/100). Cada VIT = +1% HP."
+    "expr": "round(base_hp * (1 + vit / 100))",
+    "description": "Base HP x (1 + VIT/100). Cada VIT = +1% HP. (round p/ o ganho aparecer ja no 1o ponto em level baixo)"
   },
   {
     "id": "max_sp",
     "name": "SP Máximo",
-    "expr": "floor(base_sp * (1 + int / 100))",
+    "expr": "round(base_sp * (1 + int / 100))",
     "description": "Base SP x (1 + INT/100). Cada INT = +1% SP."
   },
   {
