@@ -639,6 +639,11 @@ func _handle_level_up(payload: Dictionary) -> void:
 		payload.get("xp",         CharacterData.xp),
 		payload.get("xp_to_next", CharacterData.xp_to_next)
 	)
+	# Subir de nível restaura HP/SP 100% no novo máximo
+	if payload.has("hp_max"):
+		CharacterData.apply_damage(payload.get("hp", CharacterData.max_hp), payload.get("hp_max", CharacterData.max_hp))
+	if payload.has("sp_max"):
+		CharacterData.apply_sp(payload.get("sp", CharacterData.max_sp), payload.get("sp_max", CharacterData.max_sp))
 
 func _handle_map_change(payload: Dictionary) -> void:
 	GameState.character["current_map"] = payload.get("map_id", "")

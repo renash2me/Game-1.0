@@ -324,10 +324,26 @@ async def _handle_mob_death(
 
         updates = {"xp": str(new_xp), "xp_to_next": str(new_xp_to_next)}
         leveled = new_level > level
+        new_hp_max = int(char_raw.get("hp_max", 1))
+        new_sp_max = int(char_raw.get("sp_max", 1))
         if leveled:
             updates["level"] = str(new_level)
             updates["stat_points"] = str(int(char_raw.get("stat_points", 0)) + sp)
             updates["skill_points"] = str(int(char_raw.get("skill_points", 0)) + skp)
+            # Recalcula HP/SP máx no novo level e restaura 100%
+            from app.systems.formulas import derive_stats
+            d = derive_stats(
+                level=new_level,
+                str_=int(char_raw.get("str_stat", 1)), agi=int(char_raw.get("agi", 1)),
+                vit=int(char_raw.get("vit", 1)), int_=int(char_raw.get("int_stat", 1)),
+                dex=int(char_raw.get("dex", 1)), luk=int(char_raw.get("luk", 1)),
+            )
+            new_hp_max = max(1, int(d.get("max_hp", new_hp_max)))
+            new_sp_max = max(1, int(d.get("max_sp", new_sp_max)))
+            updates["hp_max"] = str(new_hp_max)
+            updates["sp_max"] = str(new_sp_max)
+            updates["hp"] = str(new_hp_max)
+            updates["sp"] = str(new_sp_max)
 
         await r.hset(f"char_stats:{killer_id}", mapping=updates)
         await _persist_char_to_db(killer_id, updates)
@@ -342,6 +358,10 @@ async def _handle_mob_death(
                     "skill_points_gained": skp,
                     "xp": new_xp,
                     "xp_to_next": new_xp_to_next,
+                    "hp": new_hp_max,
+                    "hp_max": new_hp_max,
+                    "sp": new_sp_max,
+                    "sp_max": new_sp_max,
                 },
                 "timestamp": _now(),
             })
@@ -627,6 +647,7 @@ async def _cache_char_stats(character) -> None:
         "current_map": character.current_map,
         "pos_x": str(character.pos_x),
         "pos_y": str(character.pos_y),
+        "dead": "0",   # entra sempre vivo (evita flag 'dead' presa = jogador invencível)
     })
 
 
@@ -653,6 +674,14 @@ async def _persist_char_to_db(character_id: uuid.UUID, updates: dict) -> None:
                 char.stat_points = int(updates["stat_points"])
             if "skill_points" in updates:
                 char.skill_points = int(updates["skill_points"])
+            if "hp" in updates:
+                char.hp = int(updates["hp"])
+            if "hp_max" in updates:
+                char.hp_max = int(updates["hp_max"])
+            if "sp" in updates:
+                char.sp = int(updates["sp"])
+            if "sp_max" in updates:
+                char.sp_max = int(updates["sp_max"])
             await session.commit()
 
 
