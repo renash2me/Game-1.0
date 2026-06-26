@@ -2,8 +2,8 @@
   {
     "id": "base_hp",
     "name": "HP Base (por level)",
-    "expr": "35 + level * 12",
-    "description": "HP base antes do multiplicador de VIT. Curva por level (provisória)."
+    "expr": "35 + level * 5",
+    "description": "Novice: HP_JOB_A=0, HP_JOB_B=5 -> BaseHP = 35 + BaseLv*5. Coeficientes sao por classe; aqui valem para Novice (motor ainda nao recebe a classe)."
   },
   {
     "id": "base_sp",
@@ -102,9 +102,15 @@
     "description": "Porcentagem do XP necessário para o próximo level que se perde ao morrer."
   },
   {
+    "id": "aspd_stat",
+    "name": "ASPD (valor bruto, base + AGI/DEX)",
+    "expr": "min(193, 156 + agi * 0.4 + dex * 0.1)",
+    "description": "Base ASPD da classe + AGI*coef + DEX*coef. Base 156 e coefs 0.4/0.1 sao PROVISORIOS (no RO mudam por classe+arma, ainda nao modeladas). Limite 193."
+  },
+  {
     "id": "aspd",
     "name": "Velocidade de ataque (ataques/seg)",
-    "expr": "1.0 + agi * 0.03 + dex * 0.01",
-    "description": "Provisório. No RO depende de AGI, DEX, arma e classe (arma/classe ainda não modeladas)."
+    "expr": "50 / (200 - aspd_stat)",
+    "description": "Conversao do RO: ataques/seg = 50 / (200 - ASPD). O cliente usa 1/aspd como intervalo do auto-attack."
   }
 ]
