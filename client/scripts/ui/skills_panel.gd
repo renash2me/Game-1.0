@@ -17,6 +17,7 @@ var _res_size    : Vector2 = Vector2.ZERO
 func _ready() -> void:
 	_build_ui()
 	call_deferred("_center_panel")
+	visibility_changed.connect(_on_visibility_changed)
 
 func _on_visibility_changed() -> void:
 	if visible:

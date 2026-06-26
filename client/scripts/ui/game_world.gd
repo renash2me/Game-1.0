@@ -131,15 +131,15 @@ func _to_server(v: Vector3) -> Vector2:
 # ── Raycast mouse → plano do chão (y = 0) ────────────────────────────────────
 
 func _ground_at_mouse() -> Vector3:
-	var mouse   := get_viewport().get_mouse_position()
-	var from    := _camera.project_ray_origin(mouse)
-	# Usa o forward real da câmera em vez de project_ray_normal,
-	# que pode retornar vetor inesperado em câmeras ortográficas no Godot 4.7
-	var forward := -_camera.global_transform.basis.z
-	if absf(forward.y) < 0.001:
+	var mouse  := get_viewport().get_mouse_position()
+	var origin := _camera.project_ray_origin(mouse)
+	# Direção fixa: câmera SEMPRE aponta de CAM_OFFSET para (0,0.5,0) relativo ao player
+	# normalize(Vector3(0,0.5,0) - CAM_OFFSET) = normalize(0,-11.5,-8.5) ≈ (0,-0.80420,-0.59441)
+	var ground := Plane(Vector3.UP, 0.0)
+	var hit    := ground.intersects_ray(origin, Vector3(0.0, -0.80420, -0.59441))
+	if hit == null:
 		return Vector3.ZERO
-	var t := -from.y / forward.y
-	return from + forward * t
+	return hit
 
 # ── Input ──────────────────────────────────────────────────────────────────────
 
