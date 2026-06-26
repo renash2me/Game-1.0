@@ -40,21 +40,21 @@ func init_from_character(char_data: Dictionary) -> void:
 	hp           = char_data.get("hp", 100)
 	max_hp       = char_data.get("hp_max", 100)
 	sp           = char_data.get("sp", 50)
-	max_sp       = char.get("sp_max", 50)
-	zeny         = char.get("zeny", 0)
-	str_stat     = char.get("str_stat", 1)
-	agi          = char.get("agi", 1)
-	vit          = char.get("vit", 1)
-	int_stat     = char.get("int_stat", 1)
-	dex          = char.get("dex", 1)
-	luk          = char.get("luk", 1)
-	stat_points  = char.get("stat_points", 0)
-	skill_points = char.get("skill_points", 0)
+	max_sp       = char_data.get("sp_max", 50)
+	zeny         = char_data.get("zeny", 0)
+	str_stat     = char_data.get("str_stat", 1)
+	agi          = char_data.get("agi", 1)
+	vit          = char_data.get("vit", 1)
+	int_stat     = char_data.get("int_stat", 1)
+	dex          = char_data.get("dex", 1)
+	luk          = char_data.get("luk", 1)
+	stat_points  = char_data.get("stat_points", 0)
+	skill_points = char_data.get("skill_points", 0)
 
-func apply_from_response(char: Dictionary) -> void:
+func apply_from_response(char_data: Dictionary) -> void:
 	var old_class := class_id
-	init_from_character(char)
-	GameState.character = char
+	init_from_character(char_data)
+	GameState.character = char_data
 	hp_changed.emit(hp, max_hp)
 	sp_changed.emit(sp, max_sp)
 	xp_changed.emit(xp, xp_to_next)
