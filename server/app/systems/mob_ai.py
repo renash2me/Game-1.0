@@ -73,15 +73,12 @@ async def _tick_mob(
     aggro_range = float(mob_data.get("aggro_range", 0))
     attack_range = float(mob_data.get("attack_range", 50))
     ai_type = mob_data.get("ai_type", "passive")
-    hp_pct = hp / hp_max if hp_max > 0 else 1.0
 
     updates: dict = {}
 
     # ── Transições de estado ────────────────────────────────────────────
-    if hp_pct < 0.2 and state not in ("flee", "dead"):
-        state = "flee"
-        updates["state"] = "flee"
-    elif hp_pct >= 0.2 and state == "flee":
+    # Nenhum mob foge: luta até morrer. Converte qualquer 'flee' antigo em aggro.
+    if state == "flee":
         state = "aggro"
         updates["state"] = "aggro"
 
@@ -140,17 +137,6 @@ async def _tick_mob(
                     updates["x"] = str(nx)
                     updates["y"] = str(ny)
                     await _broadcast_move(map_id, instance_id, nx, ny)
-
-    # ── FLEE ─────────────────────────────────────────────────────────────
-    elif state == "flee":
-        if target_id:
-            tpos = await _player_pos(target_id, r)
-            if tpos:
-                tx, ty = tpos
-                nx, ny = _step_away(x, y, tx, ty, move_speed * TICK * 1.5)
-                updates["x"] = str(nx)
-                updates["y"] = str(ny)
-                await _broadcast_move(map_id, instance_id, nx, ny)
 
     if updates:
         await r.hset(f"mob:{instance_id}", mapping=updates)
@@ -296,11 +282,3 @@ def _step_toward(x: float, y: float, tx: float, ty: float, speed: float) -> tupl
         return tx, ty
     ratio = speed / d
     return x + (tx - x) * ratio, y + (ty - y) * ratio
-
-
-def _step_away(x: float, y: float, tx: float, ty: float, speed: float) -> tuple[float, float]:
-    d = _dist(x, y, tx, ty)
-    if d < 1:
-        return x + speed, y
-    ratio = speed / d
-    return x - (tx - x) * ratio, y - (ty - y) * ratio
