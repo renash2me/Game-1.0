@@ -17,9 +17,10 @@
     "size": "small",
     "element": "water",
     "race": "plant",
+    "respawn_seconds": 8,
     "tags": [],
     "spawns": [
-      {"map_id": "starter_village", "count": 3, "respawn_seconds": 20, "area": {"x1": -170.0, "y1": -210.0, "x2": 170.0, "y2": -70.0}}
+      {"map_id": "starter_village", "count": 3, "area": {"x1": -170.0, "y1": -210.0, "x2": 170.0, "y2": -70.0}}
     ],
     "drops": [
       {"item_id": "jellopy",       "chance": 0.7000},
@@ -46,6 +47,7 @@
     "size": "small",
     "element": "earth",
     "race": "insect",
+    "respawn_seconds": 30,
     "tags": [],
     "spawns": [],
     "drops": [

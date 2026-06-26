@@ -12,6 +12,13 @@ func _ready() -> void:
 	_add_background()
 	GameState.clear()
 
+	# Enter no teclado envia o formulário (login e registro)
+	_username.text_submitted.connect(func(_t): _on_login_pressed())
+	_password.text_submitted.connect(func(_t): _on_login_pressed())
+	_reg_user.text_submitted.connect(func(_t): _on_register_pressed())
+	_reg_email.text_submitted.connect(func(_t): _on_register_pressed())
+	_reg_pass.text_submitted.connect(func(_t): _on_register_pressed())
+
 func _add_background() -> void:
 	var bg := TextureRect.new()
 	bg.texture = load("res://assets/sprites/login_bg.png")

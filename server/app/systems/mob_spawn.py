@@ -30,12 +30,13 @@ def get_map_spawns(map_id: str) -> list:
             "area": sp.get("area", {}),
         })
     for mob_id, mob in get_monsters().items():
+        mob_respawn = int(mob.get("respawn_seconds", 10))  # CD do cadastro do monstro
         for sp in mob.get("spawns", []):
             if sp.get("map_id") == map_id:
                 spawns.append({
                     "mob_id": mob_id,
                     "count": sp.get("count", 1),
-                    "respawn_seconds": sp.get("respawn_seconds", 30),
+                    "respawn_seconds": sp.get("respawn_seconds", mob_respawn),
                     "area": sp.get("area", {}),
                 })
     return spawns

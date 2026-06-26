@@ -281,6 +281,7 @@ function cardContent(cat, r) {
     <span>✨ ${r.base_xp} XP</span>
     <span>💀 ${r.drops?.length ?? 0} drops</span>
     <span>👾 ${r.spawns?.length ?? 0} spawns</span>
+    <span>⏱ ${r.respawn_seconds ?? '-'}s</span>
     <span>${r.element} / ${r.race}</span>
   `};
   if (cat === 'maps') return { meta: `
@@ -414,6 +415,7 @@ function buildMonsterForm(d) {
     ${field('f_move_speed','Move Speed',d.move_speed,'number')}
     ${field('f_attack_range','Atk Range',d.attack_range,'number')}
     ${field('f_aggro_range','Aggro Range',d.aggro_range,'number')}
+    ${field('f_respawn','Respawn (s)',d.respawn_seconds,'number')}
     ${field('f_ai_type','IA',d.ai_type,'text',{options:ais})}
     ${field('f_size','Tamanho',d.size,'text',{options:sizes})}
     ${field('f_element','Elemento',d.element,'text',{options:elements})}
@@ -480,8 +482,12 @@ function removeDrop(i) { dropsData.splice(i,1); renderDrops(); }
 // ── Spawns UI ───────────────────────────────────────────────────────────────────
 let spawnsData = [];
 let mapsCache = [];
-function initSpawnsUI(spawns=[]) {
+async function initSpawnsUI(spawns=[]) {
   spawnsData = spawns ? spawns.map(s=>({...s, area:{...(s.area||{})}})) : [];
+  // Busca os mapas na hora de abrir (no load da página o token ainda está vazio)
+  if (!mapsCache.length) {
+    try { mapsCache = await api('GET', '/maps'); } catch { mapsCache = []; }
+  }
   renderSpawns();
 }
 function renderSpawns() {
@@ -494,8 +500,7 @@ function renderSpawns() {
       <select style="${inp};flex:1;min-width:130px" onchange="spawnsData[${i}].map_id=this.value">
         <option value="">— mapa —</option>${opts}
       </select>
-      <input style="${inp};width:56px" type="number" min="1" title="quantidade" value="${s.count??1}" oninput="spawnsData[${i}].count=parseInt(this.value)||1">
-      <input style="${inp};width:74px" type="number" min="0" title="respawn (s)" value="${s.respawn_seconds??30}" oninput="spawnsData[${i}].respawn_seconds=parseInt(this.value)||30">
+      <input style="${inp};width:64px" type="number" min="1" title="quantidade" placeholder="qtd" value="${s.count??1}" oninput="spawnsData[${i}].count=parseInt(this.value)||1">
       <input style="${inp};width:56px" type="number" title="x1" placeholder="x1" value="${s.area?.x1??''}" oninput="spawnsData[${i}].area.x1=parseFloat(this.value)||0">
       <input style="${inp};width:56px" type="number" title="y1" placeholder="y1" value="${s.area?.y1??''}" oninput="spawnsData[${i}].area.y1=parseFloat(this.value)||0">
       <input style="${inp};width:56px" type="number" title="x2" placeholder="x2" value="${s.area?.x2??''}" oninput="spawnsData[${i}].area.x2=parseFloat(this.value)||0">
@@ -504,7 +509,7 @@ function renderSpawns() {
     </div>`).join('');
   spawnsData.forEach((s,i) => { const sel=el.children[i]?.querySelector('select'); if(sel) sel.value=s.map_id||''; });
 }
-function addSpawn() { spawnsData.push({map_id:'',count:1,respawn_seconds:30,area:{x1:-100,y1:-100,x2:100,y2:100}}); renderSpawns(); }
+function addSpawn() { spawnsData.push({map_id:'',count:1,area:{x1:-100,y1:-100,x2:100,y2:100}}); renderSpawns(); }
 function removeSpawn(i) { spawnsData.splice(i,1); renderSpawns(); }
 
 // ── Save ──────────────────────────────────────────────────────────────────────
@@ -551,6 +556,7 @@ function collectMonster() {
     vit:vn('f_vit'), int_:vn('f_int_'), dex:vn('f_dex'), luk:vn('f_luk'),
     attack_min:vn('f_attack_min'), attack_max:vn('f_attack_max'), defense:vn('f_defense'),
     move_speed:vn('f_move_speed'), attack_range:vn('f_attack_range'), aggro_range:vn('f_aggro_range'),
+    respawn_seconds:vn('f_respawn'),
     ai_type:v('f_ai_type'), size:v('f_size'), element:v('f_element'), race:v('f_race'),
     drops: dropsData.filter(d=>d.item_id),
     spawns: spawnsData.filter(s=>s.map_id) });
