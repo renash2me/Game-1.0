@@ -152,6 +152,8 @@ async def dispatch(manager: ConnectionManager, character_id: uuid.UUID, raw: str
             await _handle_pickup(manager, character_id, payload)
         case "CHAT":
             await _handle_chat(manager, character_id, payload)
+        case "SIT":
+            await _handle_sit(manager, character_id, payload)
         case _:
             logger.debug("ws_unknown_type", type=msg_type)
 
@@ -185,6 +187,8 @@ async def _handle_move(manager: ConnectionManager, character_id: uuid.UUID, payl
         manager.join_map(character_id, map_id)
 
     await r.hset(f"pos:{character_id}", mapping={"map_id": map_id, "x": str(x), "y": str(y)})
+    # Mover levanta o personagem (cancela o estado sentado)
+    await r.hset(f"char_stats:{character_id}", "sitting", "0")
 
     await broadcast_map(manager, map_id, {
         "type": "PLAYER_MOVE",
@@ -403,6 +407,15 @@ async def _handle_pickup(manager: ConnectionManager, character_id: uuid.UUID, pa
     })
 
     logger.debug("drop_picked", drop_id=drop_id, character_id=str(character_id), item=item_id)
+
+
+# ── SIT ──────────────────────────────────────────────────────────────────────
+
+async def _handle_sit(manager: ConnectionManager, character_id: uuid.UUID, payload: dict) -> None:
+    from app.redis_client import get_redis
+    r = get_redis()
+    sitting = "1" if payload.get("sitting") else "0"
+    await r.hset(f"char_stats:{character_id}", "sitting", sitting)
 
 
 # ── CHAT ─────────────────────────────────────────────────────────────────────

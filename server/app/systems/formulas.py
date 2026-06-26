@@ -111,12 +111,24 @@ def derive_stats(
     level: int = 1, str_: int = 1, agi: int = 1, vit: int = 1,
     int_: int = 1, dex: int = 1, luk: int = 1,
 ) -> dict:
-    """Calcula TODOS os atributos derivados a partir dos atributos base."""
-    env = _env(level, str_, agi, vit, int_, dex, luk)
-    out: dict = {}
-    for fid, formula in get_formulas().items():
-        out[fid] = eval_formula(formula.get("expr", "0"), env)
-    return out
+    """Calcula TODOS os atributos derivados a partir dos atributos base.
+
+    As fórmulas podem referenciar outros atributos derivados (ex.: hp_regen usa
+    max_hp, que usa base_hp). Resolvemos isso em múltiplos passes: os ids
+    derivados começam em 0 e são reavaliados até estabilizar."""
+    base = _env(level, str_, agi, vit, int_, dex, luk)
+    formulas = get_formulas()
+    results: dict = {fid: 0.0 for fid in formulas}
+    for _ in range(5):
+        changed = False
+        for fid, formula in formulas.items():
+            val = eval_formula(formula.get("expr", "0"), {**base, **results})
+            if results.get(fid) != val:
+                results[fid] = val
+                changed = True
+        if not changed:
+            break
+    return results
 
 
 def apply_derived(character) -> None:

@@ -26,6 +26,9 @@ async def lifespan(app: FastAPI):
     from app.systems.mob_spawn import initialize_all_maps
     await initialize_all_maps()
 
+    from app.systems.regen import regen_loop
+    _ai_tasks.append(asyncio.create_task(regen_loop()))
+
     yield
 
     for task in _ai_tasks:

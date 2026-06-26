@@ -33,6 +33,7 @@ var _drag_to_move : bool   = false       # o hold atual deve arrastar-mover? (fa
 var _target_mob  : String  = ""          # mob travado para auto-attack (persegue e ataca sozinho)
 var _attack_cd   : float   = 0.0         # tempo restante até o próximo auto-ataque
 var _attack_interval : float = ATTACK_INTERVAL   # intervalo entre ataques (derivado do aspd)
+var _sitting     : bool    = false       # sentado? (regenera HP/SP mais rápido — tecla Insert)
 var _dest_cell   : Vector2i = Vector2i(0x7fffffff, 0x7fffffff)  # última célula de destino (evita recalcular no drag)
 var _mob_dest    : Dictionary = {}        # instance_id -> Vector3 alvo (suavização de movimento)
 var _remote_dest : Dictionary = {}        # character_id -> Vector3 alvo (suavização de movimento)
@@ -173,6 +174,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					if _inv_ui.visible:
 						return
 					_left_held = true
+					_stand_up()   # agir levanta o personagem
 					var target := _ground_at_mouse()
 					# Estilo Ragnarok: clicar num monstro ataca; no chão, anda.
 					var mob_id := _mob_at(target)
@@ -197,6 +199,20 @@ func _unhandled_input(event: InputEvent) -> void:
 			_set_destination(_ground_at_mouse())
 	elif event.is_action_pressed("inventory"):
 		_inv_ui.visible = !_inv_ui.visible
+	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_INSERT:
+		_toggle_sit()   # sentar/levantar (regenera HP/SP mais rápido sentado)
+		get_viewport().set_input_as_handled()
+
+# ── Sentar / levantar ───────────────────────────────────────────────────────────
+
+func _toggle_sit() -> void:
+	_sitting = not _sitting
+	WsClient.send({"type": "SIT", "payload": {"sitting": _sitting}})
+
+func _stand_up() -> void:
+	if _sitting:
+		_sitting = false
+		WsClient.send({"type": "SIT", "payload": {"sitting": false}})
 
 # ── Process loop ───────────────────────────────────────────────────────────────
 
@@ -352,6 +368,7 @@ func _on_ws_message(type: String, payload: Dictionary) -> void:
 		"DROP_APPEAR":  _handle_drop_appear(payload)
 		"DROP_TAKEN":   _handle_drop_taken(payload)
 		"DAMAGE":       _handle_damage(payload)
+		"STATS_UPDATE": _handle_stats_update(payload)
 		"XP_GAIN":      _handle_xp_gain(payload)
 		"LEVEL_UP":     _handle_level_up(payload)
 		"MAP_CHANGE":   _handle_map_change(payload)
@@ -440,6 +457,10 @@ func _handle_damage(payload: Dictionary) -> void:
 		node = _mobs.get(target_id, null)
 	if node != null:
 		_spawn_damage_label(node.position, "Miss" if is_miss else str(dmg))
+
+func _handle_stats_update(payload: Dictionary) -> void:
+	CharacterData.apply_damage(payload.get("hp", CharacterData.hp), payload.get("hp_max", CharacterData.max_hp))
+	CharacterData.apply_sp(payload.get("sp", CharacterData.sp), payload.get("sp_max", CharacterData.max_sp))
 
 func _handle_xp_gain(payload: Dictionary) -> void:
 	CharacterData.apply_xp(

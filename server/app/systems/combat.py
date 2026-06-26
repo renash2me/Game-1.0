@@ -8,7 +8,8 @@ class CombatStats:
     def_: int
     hit: int
     flee: int
-    crit: int  # em unidades de 1/10000 — ex: 500 = 5%
+    crit: float          # em PORCENTAGEM — ex: 10.0 = 10%
+    perfect_dodge: float = 0.0  # % de esquiva garantida (ignora hit)
 
 
 def stats_from_character(char: dict) -> CombatStats:
@@ -33,7 +34,8 @@ def stats_from_character(char: dict) -> CombatStats:
         def_=int(d.get("def", 0)),
         hit=int(d.get("hit", 1)),
         flee=int(d.get("flee", 1)),
-        crit=int(d.get("crit", 0)),
+        crit=float(d.get("crit", 0.0)),
+        perfect_dodge=float(d.get("perfect_dodge", 0.0)),
     )
 
 
@@ -49,7 +51,8 @@ def stats_from_mob(mob: dict) -> CombatStats:
         def_=int(mob.get("defense", 0)),
         hit=int(mob.get("dex", 6)) + level,
         flee=int(mob.get("agi", 1)) + level,
-        crit=int(mob.get("luk", 5)) * 30,
+        crit=int(mob.get("luk", 5)) * 0.3 + 1.0,  # mesma escala % do personagem
+        perfect_dodge=0.0,
     )
 
 
@@ -58,13 +61,17 @@ def physical_attack(attacker: CombatStats, defender: CombatStats) -> tuple[int, 
     Calcula um ataque físico.
     Retorna: (damage, is_miss, is_critical)
     """
+    # Perfect Dodge: esquiva garantida (% do defensor, ignora hit)
+    if defender.perfect_dodge > 0 and random.uniform(0, 100) < defender.perfect_dodge:
+        return 0, True, False
+
     # Chance de miss: diferença entre flee do defensor e hit do atacante
     miss_chance = max(0.05, min(0.95, (defender.flee - attacker.hit) / 200 + 0.2))
     if random.random() < miss_chance:
         return 0, True, False
 
-    # Crítico
-    is_crit = random.randint(1, 10_000) <= attacker.crit
+    # Crítico (crit em porcentagem)
+    is_crit = random.uniform(0, 100) < attacker.crit
 
     # Dano base com ±10% de aleatoriedade
     base = attacker.atk * random.uniform(0.9, 1.1)
