@@ -136,6 +136,24 @@ async def send_map_state(manager: ConnectionManager, character_id: uuid.UUID) ->
             "timestamp": _now(),
         })
 
+    # DROP_APPEAR — drops já no chão (para quem entra/volta ao mapa)
+    drop_ids = await r.smembers(f"map_drops:{map_id}")
+    for did in drop_ids:
+        draw = await r.hgetall(f"drop:{did}")
+        if not draw:
+            continue
+        await send_to(manager, character_id, {
+            "type": "DROP_APPEAR",
+            "payload": {
+                "drop_id": did,
+                "item_id": draw.get("item_id", ""),
+                "quantity": int(draw.get("quantity", "1")),
+                "x": float(draw.get("x", 0)),
+                "y": float(draw.get("y", 0)),
+            },
+            "timestamp": _now(),
+        })
+
 
 # ── Dispatch ─────────────────────────────────────────────────────────────────
 

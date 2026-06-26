@@ -384,6 +384,7 @@ func _on_ws_message(type: String, payload: Dictionary) -> void:
 		"PLAYER_LEAVE": _handle_player_leave(payload)
 		"MOB_DEATH":    _handle_mob_death(payload)
 		"DROP_APPEAR":  _handle_drop_appear(payload)
+		"DROP_PICKED":  _handle_drop_taken(payload)
 		"DROP_TAKEN":   _handle_drop_taken(payload)
 		"DAMAGE":       _handle_damage(payload)
 		"STATS_UPDATE": _handle_stats_update(payload)
@@ -444,10 +445,19 @@ func _handle_mob_death(payload: Dictionary) -> void:
 		_mob_dest.erase(iid)
 	if iid == _target_mob:
 		_target_mob = ""
+	# Os drops vêm dentro do MOB_DEATH — renderiza cada um no chão
+	for drop in payload.get("drops", []):
+		_spawn_drop(drop)
 
 func _handle_drop_appear(payload: Dictionary) -> void:
-	var drop_id : String = payload.get("drop_id", "")
-	var pos := _to_3d(payload.get("x", 0.0), payload.get("y", 0.0))
+	# Mensagem avulsa (ex.: drops já no chão ao entrar no mapa)
+	_spawn_drop(payload)
+
+func _spawn_drop(drop: Dictionary) -> void:
+	var drop_id : String = drop.get("drop_id", "")
+	if drop_id == "" or drop_id in _drops:
+		return
+	var pos := _to_3d(drop.get("x", 0.0), drop.get("y", 0.0))
 	var node := _build_drop_node(drop_id, pos)
 	_drop_layer.add_child(node)
 	_drops[drop_id] = node
