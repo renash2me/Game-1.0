@@ -41,14 +41,27 @@ def get_map_spawns(map_id: str) -> list:
     return spawns
 
 
+async def _clear_map_mobs(map_id: str, r) -> None:
+    """Remove instâncias de mobs antigas do Redis (evita acúmulo a cada restart)."""
+    mob_ids = await r.smembers(f"map_mobs:{map_id}")
+    if mob_ids:
+        pipe = r.pipeline()
+        for iid in mob_ids:
+            pipe.delete(f"mob:{iid}")
+        pipe.delete(f"map_mobs:{map_id}")
+        await pipe.execute()
+
+
 async def initialize_all_maps() -> None:
     """Spawna mobs iniciais em todos os mapas e inicia os loops de IA."""
     from app.systems.mob_ai import run_map_ai_loop
 
+    r = get_redis()
     for map_id in get_maps():
         spawns = get_map_spawns(map_id)
         if not spawns:
             continue
+        await _clear_map_mobs(map_id, r)   # limpa mobs antigos antes de spawnar os novos
         await spawn_map_mobs(map_id, spawns)
         _AI_TASKS.append(asyncio.create_task(run_map_ai_loop(map_id), name=f"ai_{map_id}"))
 

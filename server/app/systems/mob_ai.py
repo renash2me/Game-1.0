@@ -230,10 +230,10 @@ async def _mob_attack(
     logger.debug("mob_attacked", mob=mob_data["id"], target=target_id, dmg=damage)
 
     if new_hp <= 0:
-        await _apply_death(target_id, char_raw, r)
+        await _apply_death(target_id, char_raw, map_id, r)
 
 
-async def _apply_death(target_id: str, char_raw: dict, r) -> None:
+async def _apply_death(target_id: str, char_raw: dict, map_id: str, r) -> None:
     """Personagem morreu: aplica penalidade de XP e marca como morto.
     O renascimento (posição/HP cheio) acontece quando o cliente pede RESPAWN."""
     import uuid as _uuid
@@ -258,6 +258,13 @@ async def _apply_death(target_id: str, char_raw: dict, r) -> None:
     new_xp = max(0, xp - xp_loss)
 
     await r.hset(f"char_stats:{target_id}", mapping={"hp": "0", "dead": "1", "xp": str(new_xp)})
+
+    # Mobs perdem o alvo quando o jogador morre — não retomam o ataque ao renascer
+    mob_ids = await r.smembers(f"map_mobs:{map_id}")
+    for iid in mob_ids:
+        if (await r.hget(f"mob:{iid}", "target_id")) == target_id:
+            await r.hset(f"mob:{iid}", mapping={"state": "idle", "target_id": ""})
+
     try:
         from app.ws.handlers import _persist_char_to_db
         await _persist_char_to_db(_uuid.UUID(target_id), {"xp": str(new_xp)})
