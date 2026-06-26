@@ -30,16 +30,16 @@ var class_id:   String = "novice"
 var class_tier: int    = 0
 var char_name:  String = ""
 
-func init_from_character(char: Dictionary) -> void:
-	char_name    = char.get("name", "")
-	class_id     = char.get("class_id", "novice")
-	class_tier   = char.get("class_tier", 0)
-	level        = char.get("level", 1)
-	xp           = char.get("xp", 0)
-	xp_to_next   = char.get("xp_to_next", 10)
-	hp           = char.get("hp", 100)
-	max_hp       = char.get("hp_max", 100)
-	sp           = char.get("sp", 50)
+func init_from_character(char_data: Dictionary) -> void:
+	char_name    = char_data.get("name", "")
+	class_id     = char_data.get("class_id", "novice")
+	class_tier   = char_data.get("class_tier", 0)
+	level        = char_data.get("level", 1)
+	xp           = char_data.get("xp", 0)
+	xp_to_next   = char_data.get("xp_to_next", 10)
+	hp           = char_data.get("hp", 100)
+	max_hp       = char_data.get("hp_max", 100)
+	sp           = char_data.get("sp", 50)
 	max_sp       = char.get("sp_max", 50)
 	zeny         = char.get("zeny", 0)
 	str_stat     = char.get("str_stat", 1)

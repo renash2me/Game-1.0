@@ -18,7 +18,6 @@ const SEND_INTERVAL : float  = 0.1
 @onready var _drop_layer   : Node3D     = $Layers/Drops
 @onready var _camera       : Camera3D   = $Camera3D
 @onready var _hud          : CanvasLayer = $HUD
-@onready var _chat_ui      : Control    = $HUD/Chat
 @onready var _inv_ui       : Control    = $HUD/Inventory
 
 # ── Estado ─────────────────────────────────────────────────────────────────────

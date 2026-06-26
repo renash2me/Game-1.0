@@ -27,7 +27,7 @@ func _request(method: int, path: String, body: Dictionary, callback: Callable) -
 	add_child(http)
 
 	http.request_completed.connect(
-		func(result: int, code: int, _headers: PackedStringArray, body_bytes: PackedByteArray):
+		func(_result: int, code: int, _headers: PackedStringArray, body_bytes: PackedByteArray):
 			var data = null
 			if body_bytes.size() > 0:
 				data = JSON.parse_string(body_bytes.get_string_from_utf8())
