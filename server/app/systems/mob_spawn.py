@@ -17,24 +17,48 @@ DROP_EXPIRE_SECONDS = 300  # drops somem após 5 min
 _AI_TASKS: list[asyncio.Task] = []
 
 
+def get_map_spawns(map_id: str) -> list:
+    """Spawns de um mapa, combinando os definidos no mapa (legado, spawn_points)
+    e os definidos em cada monstro (campo 'spawns' do cadastro do monstro)."""
+    spawns: list = []
+    map_data = get_maps().get(map_id, {})
+    for sp in map_data.get("spawn_points", []):
+        spawns.append({
+            "mob_id": sp["mob_id"],
+            "count": sp.get("count", 1),
+            "respawn_seconds": sp.get("respawn_seconds", 30),
+            "area": sp.get("area", {}),
+        })
+    for mob_id, mob in get_monsters().items():
+        for sp in mob.get("spawns", []):
+            if sp.get("map_id") == map_id:
+                spawns.append({
+                    "mob_id": mob_id,
+                    "count": sp.get("count", 1),
+                    "respawn_seconds": sp.get("respawn_seconds", 30),
+                    "area": sp.get("area", {}),
+                })
+    return spawns
+
+
 async def initialize_all_maps() -> None:
     """Spawna mobs iniciais em todos os mapas e inicia os loops de IA."""
     from app.systems.mob_ai import run_map_ai_loop
 
-    maps = get_maps()
-    for map_data in maps.values():
-        map_id = map_data["id"]
-        await spawn_map_mobs(map_id, map_data.get("spawn_points", []))
-        if map_data.get("spawn_points"):
-            _AI_TASKS.append(asyncio.create_task(run_map_ai_loop(map_id), name=f"ai_{map_id}"))
+    for map_id in get_maps():
+        spawns = get_map_spawns(map_id)
+        if not spawns:
+            continue
+        await spawn_map_mobs(map_id, spawns)
+        _AI_TASKS.append(asyncio.create_task(run_map_ai_loop(map_id), name=f"ai_{map_id}"))
 
     logger.info("mob_ai_started", maps=len(_AI_TASKS))
 
 
-async def spawn_map_mobs(map_id: str, spawn_points: list) -> None:
-    for sp in spawn_points:
-        for _ in range(sp["count"]):
-            await _spawn_mob(map_id, sp["mob_id"], sp["area"])
+async def spawn_map_mobs(map_id: str, spawns: list) -> None:
+    for sp in spawns:
+        for _ in range(int(sp.get("count", 1))):
+            await _spawn_mob(map_id, sp["mob_id"], sp.get("area", {}))
 
 
 async def _spawn_mob(map_id: str, mob_id: str, area: dict) -> str:
@@ -45,10 +69,12 @@ async def _spawn_mob(map_id: str, mob_id: str, area: dict) -> str:
         return ""
 
     instance_id = str(uuid.uuid4())
-    x = random.uniform(area["x1"], area["x2"])
-    y = random.uniform(area["y1"], area["y2"])
-    cx = (area["x1"] + area["x2"]) / 2
-    cy = (area["y1"] + area["y2"]) / 2
+    x1 = float(area.get("x1", 0.0)); x2 = float(area.get("x2", 0.0))
+    y1 = float(area.get("y1", 0.0)); y2 = float(area.get("y2", 0.0))
+    x = random.uniform(x1, x2)
+    y = random.uniform(y1, y2)
+    cx = (x1 + x2) / 2
+    cy = (y1 + y2) / 2
 
     r = get_redis()
     await r.hset(f"mob:{instance_id}", mapping={

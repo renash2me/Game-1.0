@@ -273,7 +273,6 @@ async def _handle_mob_death(
     from app.systems.drop_system import roll_drops
     from app.systems.mob_spawn import respawn_mob_later, save_drops_to_redis
     from app.systems.xp_level import check_level_up
-    from app.data.loader import get_maps
 
     # Marca mob como morto e remove do mapa
     await r.hset(f"mob:{instance_id}", "state", "dead")
@@ -307,13 +306,16 @@ async def _handle_mob_death(
         new_level, new_xp, new_xp_to_next, sp, skp = check_level_up(level, new_xp, xp_to_next)
 
         updates = {"xp": str(new_xp), "xp_to_next": str(new_xp_to_next)}
-        if new_level > level:
+        leveled = new_level > level
+        if leveled:
             updates["level"] = str(new_level)
             updates["stat_points"] = str(int(char_raw.get("stat_points", 0)) + sp)
             updates["skill_points"] = str(int(char_raw.get("skill_points", 0)) + skp)
-            await r.hset(f"char_stats:{killer_id}", mapping=updates)
-            await _persist_char_to_db(killer_id, updates)
 
+        await r.hset(f"char_stats:{killer_id}", mapping=updates)
+        await _persist_char_to_db(killer_id, updates)
+
+        if leveled:
             await send_to(manager, killer_id, {
                 "type": "LEVEL_UP",
                 "payload": {
@@ -321,11 +323,23 @@ async def _handle_mob_death(
                     "new_level": new_level,
                     "stat_points_gained": sp,
                     "skill_points_gained": skp,
+                    "xp": new_xp,
+                    "xp_to_next": new_xp_to_next,
                 },
                 "timestamp": _now(),
             })
         else:
-            await r.hset(f"char_stats:{killer_id}", mapping=updates)
+            # Ganho de XP sem subir de nível: antes não avisava o cliente (barra parada)
+            await send_to(manager, killer_id, {
+                "type": "XP_GAIN",
+                "payload": {
+                    "character_id": str(killer_id),
+                    "gained": base_xp,
+                    "xp": new_xp,
+                    "xp_to_next": new_xp_to_next,
+                },
+                "timestamp": _now(),
+            })
 
     # Quest progress — kill_mob
     damage = int(char_raw.get("damage_dealt_session", 0))
@@ -334,10 +348,9 @@ async def _handle_mob_death(
     # Aptidão — atualiza de forma assíncrona para não bloquear
     asyncio.ensure_future(_update_aptitude_on_kill(killer_id, damage, mob_data, attack_type))
 
-    # Respawn
-    maps = get_maps()
-    map_data = maps.get(map_id, {})
-    for sp in map_data.get("spawn_points", []):
+    # Respawn — usa a fonte combinada (mapa + cadastro do monstro)
+    from app.systems.mob_spawn import get_map_spawns
+    for sp in get_map_spawns(map_id):
         if sp["mob_id"] == mob_id:
             asyncio.ensure_future(
                 respawn_mob_later(mob_id, map_id, sp["area"], sp["respawn_seconds"])

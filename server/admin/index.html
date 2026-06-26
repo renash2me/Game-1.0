@@ -279,6 +279,7 @@ function cardContent(cat, r) {
     <span>❤️ ${r.hp_max} HP</span>
     <span>✨ ${r.base_xp} XP</span>
     <span>💀 ${r.drops?.length ?? 0} drops</span>
+    <span>👾 ${r.spawns?.length ?? 0} spawns</span>
     <span>${r.element} / ${r.race}</span>
   `};
   if (cat === 'maps') return { meta: `
@@ -324,6 +325,7 @@ document.getElementById('btn-new').addEventListener('click', () => {
   openModal('Novo ' + currentCat.slice(0,-1));
   document.getElementById('modal-body').innerHTML = buildForm(currentCat, null);
   initDropsUI();
+  initSpawnsUI();
 });
 
 function openEdit(id) {
@@ -332,6 +334,7 @@ function openEdit(id) {
   openModal('Editar: ' + id);
   document.getElementById('modal-body').innerHTML = buildForm(currentCat, entry);
   initDropsUI(entry?.drops);
+  initSpawnsUI(entry?.spawns);
 }
 
 // ── Forms ─────────────────────────────────────────────────────────────────────
@@ -414,6 +417,11 @@ function buildMonsterForm(d) {
       <div id="drops-list" class="drops-list"></div>
       <button class="btn-ghost btn-sm" style="margin-top:8px;width:fit-content" onclick="addDrop()">+ Drop</button>
     </div>
+    <div class="field full">
+      <label>Spawns — onde este bicho nasce (mapa, quantidade, respawn, área)</label>
+      <div id="spawns-list" class="drops-list"></div>
+      <button class="btn-ghost btn-sm" style="margin-top:8px;width:fit-content" onclick="addSpawn()">+ Spawn</button>
+    </div>
   </div>`;
 }
 
@@ -445,6 +453,36 @@ function renderDrops() {
 }
 function addDrop() { dropsData.push({item_id:'',chance:0.1}); renderDrops(); }
 function removeDrop(i) { dropsData.splice(i,1); renderDrops(); }
+
+// ── Spawns UI ───────────────────────────────────────────────────────────────────
+let spawnsData = [];
+let mapsCache = [];
+function initSpawnsUI(spawns=[]) {
+  spawnsData = spawns ? spawns.map(s=>({...s, area:{...(s.area||{})}})) : [];
+  renderSpawns();
+}
+function renderSpawns() {
+  const el = document.getElementById('spawns-list');
+  if (!el) return;
+  const inp = 'background:#252836;border:1px solid #4a5568;color:#e2e8f0;padding:6px;border-radius:6px;font-size:12px';
+  const opts = mapsCache.map(m=>`<option value="${m.id}">${m.name||m.id}</option>`).join('');
+  el.innerHTML = spawnsData.map((s,i) => `
+    <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;background:#1e2130;padding:6px;border-radius:8px">
+      <select style="${inp};flex:1;min-width:130px" onchange="spawnsData[${i}].map_id=this.value">
+        <option value="">— mapa —</option>${opts}
+      </select>
+      <input style="${inp};width:56px" type="number" min="1" title="quantidade" value="${s.count??1}" oninput="spawnsData[${i}].count=parseInt(this.value)||1">
+      <input style="${inp};width:74px" type="number" min="0" title="respawn (s)" value="${s.respawn_seconds??30}" oninput="spawnsData[${i}].respawn_seconds=parseInt(this.value)||30">
+      <input style="${inp};width:56px" type="number" title="x1" placeholder="x1" value="${s.area?.x1??''}" oninput="spawnsData[${i}].area.x1=parseFloat(this.value)||0">
+      <input style="${inp};width:56px" type="number" title="y1" placeholder="y1" value="${s.area?.y1??''}" oninput="spawnsData[${i}].area.y1=parseFloat(this.value)||0">
+      <input style="${inp};width:56px" type="number" title="x2" placeholder="x2" value="${s.area?.x2??''}" oninput="spawnsData[${i}].area.x2=parseFloat(this.value)||0">
+      <input style="${inp};width:56px" type="number" title="y2" placeholder="y2" value="${s.area?.y2??''}" oninput="spawnsData[${i}].area.y2=parseFloat(this.value)||0">
+      <button class="btn-danger btn-sm" onclick="removeSpawn(${i})">✕</button>
+    </div>`).join('');
+  spawnsData.forEach((s,i) => { const sel=el.children[i]?.querySelector('select'); if(sel) sel.value=s.map_id||''; });
+}
+function addSpawn() { spawnsData.push({map_id:'',count:1,respawn_seconds:30,area:{x1:-100,y1:-100,x2:100,y2:100}}); renderSpawns(); }
+function removeSpawn(i) { spawnsData.splice(i,1); renderSpawns(); }
 
 // ── Save ──────────────────────────────────────────────────────────────────────
 document.getElementById('modal-save').addEventListener('click', async () => {
@@ -490,7 +528,8 @@ function collectMonster() {
     attack_min:vn('f_attack_min'), attack_max:vn('f_attack_max'), defense:vn('f_defense'),
     move_speed:vn('f_move_speed'), attack_range:vn('f_attack_range'), aggro_range:vn('f_aggro_range'),
     ai_type:v('f_ai_type'), size:v('f_size'), element:v('f_element'), race:v('f_race'),
-    drops: dropsData.filter(d=>d.item_id) });
+    drops: dropsData.filter(d=>d.item_id),
+    spawns: spawnsData.filter(s=>s.map_id) });
 }
 
 function collectMap() {
@@ -509,6 +548,8 @@ function showMsg(text, type='error') {
 }
 
 loadCatalog();
+// Pré-carrega os mapas para o seletor de spawns do cadastro de monstro
+api('GET', '/maps').then(m => { mapsCache = m; }).catch(()=>{});
 </script>
 </body>
 </html>

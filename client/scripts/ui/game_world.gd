@@ -12,6 +12,8 @@ const CAM_ZOOM_STEP : float  = 0.7
 const MOVE_SPEED    : float  = 2.5               # 3D units/s ≈ 100 server/s
 const GRID_SERVER   : float  = 40.0              # lado da célula (server units) — movimento estilo Ragnarok
 const REMOTE_SMOOTH : float  = 12.0              # suavização de mobs/jogadores remotos (updates discretos)
+const ATTACK_RANGE  : float  = 1.4               # 3D units (~56 server) p/ atacar o mob travado
+const ATTACK_INTERVAL : float = 1.0              # segundos entre auto-ataques
 
 # ── Referências ────────────────────────────────────────────────────────────────
 @onready var _player_layer : Node3D     = $Layers/Players
@@ -28,6 +30,8 @@ var _cam_ortho   : float   = CAM_ORTHO_DEF
 var _path        : Array[Vector3] = []   # waypoints (centros de célula) até o destino
 var _left_held   : bool    = false
 var _drag_to_move : bool   = false       # o hold atual deve arrastar-mover? (false se clicou num mob)
+var _target_mob  : String  = ""          # mob travado para auto-attack (persegue e ataca sozinho)
+var _attack_cd   : float   = 0.0         # tempo restante até o próximo auto-ataque
 var _dest_cell   : Vector2i = Vector2i(0x7fffffff, 0x7fffffff)  # última célula de destino (evita recalcular no drag)
 var _mob_dest    : Dictionary = {}        # instance_id -> Vector3 alvo (suavização de movimento)
 var _remote_dest : Dictionary = {}        # character_id -> Vector3 alvo (suavização de movimento)
@@ -166,10 +170,14 @@ func _unhandled_input(event: InputEvent) -> void:
 					# Estilo Ragnarok: clicar num monstro ataca; no chão, anda.
 					var mob_id := _mob_at(target)
 					if mob_id != "":
+						# Trava o alvo: persegue e ataca sozinho até matar ou clicar fora
 						_drag_to_move = false
-						_attack_mob(mob_id)
+						_target_mob   = mob_id
+						_attack_cd    = 0.0
+						_path.clear()
 					else:
 						_drag_to_move = true
+						_target_mob   = ""
 						_set_destination(target)
 				else:
 					_left_held    = false
@@ -201,6 +209,25 @@ func _process(delta: float) -> void:
 		if _coords_lbl != null:
 			_coords_lbl.text = "X: --  Y: --"
 
+	# Auto-attack: persegue e ataca o mob travado (estilo Ragnarok)
+	if _target_mob != "" and local_node != null:
+		if _target_mob in _mobs:
+			var mob_node = _mobs[_target_mob]
+			var to_mob : Vector3 = mob_node.position - local_node.position
+			to_mob.y = 0.0
+			if to_mob.length() <= ATTACK_RANGE:
+				_path.clear()                       # no alcance: para e ataca
+				_attack_cd -= delta
+				if _attack_cd <= 0.0:
+					_attack_cd = ATTACK_INTERVAL
+					_attack_mob(_target_mob)
+			else:
+				if _path.is_empty():
+					_dest_cell = Vector2i(0x7fffffff, 0x7fffffff)  # força recalcular a rota
+				_set_destination(mob_node.position, false)         # persegue, sem marcador
+		else:
+			_target_mob = ""    # mob morreu ou saiu de vista
+
 	# Movimento local: caminha célula a célula até esvaziar o caminho
 	if local_node != null and not _path.is_empty():
 		var target : Vector3 = _path[0]
@@ -220,7 +247,7 @@ func _process(delta: float) -> void:
 
 # ── Movimento em grade (estilo Ragnarok) ────────────────────────────────────────
 
-func _set_destination(world_point: Vector3) -> void:
+func _set_destination(world_point: Vector3, show_marker: bool = true) -> void:
 	var local_node := _get_local_player_node()
 	if local_node == null:
 		return
@@ -230,7 +257,7 @@ func _set_destination(world_point: Vector3) -> void:
 	_dest_cell = goal
 	var start := _server_to_cell(_to_server(local_node.position))
 	_path = _build_path(start, goal)
-	if not _path.is_empty():
+	if show_marker and not _path.is_empty():
 		_spawn_click_marker(_path[_path.size() - 1])
 
 func _server_to_cell(sv: Vector2) -> Vector2i:
@@ -318,6 +345,7 @@ func _on_ws_message(type: String, payload: Dictionary) -> void:
 		"DROP_APPEAR":  _handle_drop_appear(payload)
 		"DROP_TAKEN":   _handle_drop_taken(payload)
 		"DAMAGE":       _handle_damage(payload)
+		"XP_GAIN":      _handle_xp_gain(payload)
 		"LEVEL_UP":     _handle_level_up(payload)
 		"MAP_CHANGE":   _handle_map_change(payload)
 
@@ -370,6 +398,8 @@ func _handle_mob_death(payload: Dictionary) -> void:
 		_mobs[iid].queue_free()
 		_mobs.erase(iid)
 		_mob_dest.erase(iid)
+	if iid == _target_mob:
+		_target_mob = ""
 
 func _handle_drop_appear(payload: Dictionary) -> void:
 	var drop_id : String = payload.get("drop_id", "")
@@ -403,6 +433,12 @@ func _handle_damage(payload: Dictionary) -> void:
 		node = _mobs.get(target_id, null)
 	if node != null:
 		_spawn_damage_label(node.position, "Miss" if is_miss else str(dmg))
+
+func _handle_xp_gain(payload: Dictionary) -> void:
+	CharacterData.apply_xp(
+		payload.get("xp",         CharacterData.xp),
+		payload.get("xp_to_next", CharacterData.xp_to_next)
+	)
 
 func _handle_level_up(payload: Dictionary) -> void:
 	CharacterData.apply_level_up(

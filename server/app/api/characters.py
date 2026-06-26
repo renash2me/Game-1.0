@@ -93,7 +93,7 @@ async def create_character(
     if name_check.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nome de personagem já em uso")
 
-    character = Character(player_id=player.id, name=body.name, class_id=body.class_id)
+    character = Character(player_id=player.id, name=body.name, class_id=body.class_id, stat_points=10)
     session.add(character)
     await session.commit()
     await session.refresh(character)
