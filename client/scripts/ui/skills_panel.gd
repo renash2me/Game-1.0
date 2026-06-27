@@ -27,10 +27,11 @@ func _on_visibility_changed() -> void:
 
 func _build_ui() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	mouse_filter = Control.MOUSE_FILTER_PASS
+	mouse_filter = Control.MOUSE_FILTER_IGNORE   # ver inventory_ui: deixa outras janelas/mapa clicáveis
 
 	_panel = PanelContainer.new()
 	_panel.custom_minimum_size = Vector2(300, 0)
+	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_panel)
 
 	var outer := VBoxContainer.new()
@@ -179,6 +180,12 @@ func _build_skill_row(skill: Dictionary) -> void:
 	name_lbl.add_theme_font_size_override("font_size", 12)
 	top.add_child(name_lbl)
 
+	# Skills ativas podem ser arrastadas para a barra de atalhos
+	if sk_type == "active":
+		name_lbl.mouse_filter = Control.MOUSE_FILTER_STOP
+		name_lbl.tooltip_text = "Arraste para a barra de atalhos"
+		name_lbl.set_drag_forwarding(_skill_drag_data.bind(skill_id, name_str), Callable(), Callable())
+
 	var type_lbl := Label.new()
 	type_lbl.text = "[A]" if sk_type == "active" else "[P]"
 	type_lbl.modulate = Color(0.6, 0.9, 1.0) if sk_type == "active" else Color(0.75, 1.0, 0.6)
@@ -227,6 +234,13 @@ func _build_skill_row(skill: Dictionary) -> void:
 		"cur_level": cur_lv,
 		"max_level": max_lv,
 	}
+
+func _skill_drag_data(_at: Vector2, skill_id: String, name_str: String) -> Variant:
+	var preview := Label.new()
+	preview.text = "  " + name_str + "  "
+	preview.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
+	set_drag_preview(preview)
+	return {"kind": "skill", "id": skill_id, "name": name_str}
 
 func _refresh_avail() -> void:
 	var used  := _total_pending()

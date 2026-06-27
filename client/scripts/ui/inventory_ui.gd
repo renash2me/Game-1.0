@@ -79,11 +79,14 @@ func _on_ws_message(type: String, payload: Dictionary) -> void:
 
 func _build_ui() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	mouse_filter = Control.MOUSE_FILTER_PASS
+	# IGNORE (não PASS): a raiz fica invisível ao mouse, então cliques fora do _panel
+	# passam para outras janelas abertas ou para o mapa. PASS "engolia" o clique
+	# (só sobe pro pai), travando a janela de trás quando havia duas abertas.
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	_panel = PanelContainer.new()
 	_panel.custom_minimum_size = Vector2(300, 0)
-	_panel.mouse_filter = Control.MOUSE_FILTER_STOP   # consome cliques (não "vaza" pro mapa)
+	_panel.mouse_filter = Control.MOUSE_FILTER_STOP   # consome cliques dentro do painel
 	add_child(_panel)
 
 	var vbox := VBoxContainer.new()
@@ -277,6 +280,8 @@ func _build_item_row(item: Dictionary, cat: Dictionary) -> HBoxContainer:
 	row.custom_minimum_size = Vector2(0, 26)
 	row.mouse_filter = Control.MOUSE_FILTER_STOP
 	row.gui_input.connect(_on_row_gui_input.bind(item, cat))
+	# Arrastar item → barra de atalhos (consumíveis) — set_drag_forwarding evita subclasses
+	row.set_drag_forwarding(_row_drag_data.bind(item, cat), Callable(), Callable())
 
 	var name_str : String = cat.get("name", item.get("item_id", "?"))
 	var qty      : int    = item.get("quantity", 1)
@@ -312,6 +317,20 @@ func _build_item_row(item: Dictionary, cat: Dictionary) -> HBoxContainer:
 		row.add_child(hint)
 
 	return row
+
+func _row_drag_data(_at: Vector2, item: Dictionary, cat: Dictionary) -> Variant:
+	# Dado de arraste: item referenciado por item_id (a barra usa USE_ITEM por item_id)
+	var nm : String = cat.get("name", item.get("item_id", "?"))
+	var preview := Label.new()
+	preview.text = "  " + nm + "  "
+	preview.add_theme_color_override("font_color", Color(1.0, 1.0, 0.7))
+	set_drag_preview(preview)
+	return {
+		"kind":  "item",
+		"id":    str(item.get("item_id", "")),
+		"name":  nm,
+		"itype": str(cat.get("type", "")),
+	}
 
 func _on_row_gui_input(event: InputEvent, item: Dictionary, cat: Dictionary) -> void:
 	if not (event is InputEventMouseButton) or not event.pressed:

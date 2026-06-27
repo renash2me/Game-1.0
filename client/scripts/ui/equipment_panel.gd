@@ -30,10 +30,11 @@ func _on_visibility_changed() -> void:
 
 func _build_ui() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	mouse_filter = Control.MOUSE_FILTER_PASS
+	mouse_filter = Control.MOUSE_FILTER_IGNORE   # ver inventory_ui: deixa outras janelas/mapa clicáveis
 
 	_panel = PanelContainer.new()
 	_panel.custom_minimum_size = Vector2(290, 0)
+	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_panel)
 
 	var vbox := VBoxContainer.new()

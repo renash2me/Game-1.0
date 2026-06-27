@@ -14,6 +14,8 @@ const GRID_SERVER   : float  = 40.0              # lado da célula (server units
 const REMOTE_SMOOTH : float  = 12.0              # suavização de mobs/jogadores remotos (updates discretos)
 const ATTACK_RANGE  : float  = 1.4               # 3D units (~56 server) p/ atacar o mob travado
 const ATTACK_INTERVAL : float = 1.0              # segundos entre auto-ataques
+const HP_W          : float  = 0.50              # largura da barra de HP do mob (unidades 3D)
+const HP_Y          : float  = 1.02              # altura da barra de HP acima do mob
 
 # ── Referências ────────────────────────────────────────────────────────────────
 @onready var _player_layer : Node3D     = $Layers/Players
@@ -209,10 +211,14 @@ func _unhandled_input(event: InputEvent) -> void:
 						_target_mob   = ""
 						WsClient.send({"type": "PICKUP", "payload": {"drop_id": drop_id}})
 					elif _mob_at(target) != "":
-						# Trava o alvo: persegue e ataca sozinho até matar ou clicar fora
+						# Trava o alvo: persegue e ataca sozinho até matar ou clicar fora.
+						# Só zera o cooldown (= golpe imediato) ao travar um alvo NOVO;
+						# reclicar o mesmo mob não soca de novo — o auto-attack cuida do ritmo.
+						var clicked := _mob_at(target)
 						_drag_to_move = false
-						_target_mob   = _mob_at(target)
-						_attack_cd    = 0.0
+						if clicked != _target_mob:
+							_target_mob = clicked
+							_attack_cd  = 0.0
 						_path.clear()
 					else:
 						_drag_to_move = true
@@ -375,6 +381,19 @@ func _mob_at(ground_pos: Vector3) -> String:
 func _attack_mob(mob_id: String) -> void:
 	WsClient.send({"type": "ATTACK", "payload": {"target_id": mob_id, "attack_type": "melee"}})
 
+func _update_mob_hp_bar(root: Node3D, hp: int, hp_max: int) -> void:
+	if root == null or not is_instance_valid(root) or not root.has_meta("hp_fill"):
+		return
+	var fill = root.get_meta("hp_fill")
+	if not is_instance_valid(fill):
+		return
+	var w : float = root.get_meta("hp_w", 0.5)
+	var r : float = clampf(float(hp) / float(max(1, hp_max)), 0.0, 1.0)
+	# Centered: escala em x e desloca pra manter a borda esquerda fixa (esvazia pra esquerda)
+	fill.scale.x    = max(0.001, r)
+	fill.position.x = -(w * 0.5) * (1.0 - r)
+	fill.modulate   = Color(0.25, 0.85, 0.3) if r > 0.5 else (Color(0.95, 0.8, 0.2) if r > 0.25 else Color(0.9, 0.25, 0.2))
+
 func _drop_at(ground_pos: Vector3) -> String:
 	var best_id   := ""
 	var best_dist := 0.8   # raio de clique sobre o drop (~32 server units)
@@ -525,6 +544,10 @@ func _handle_damage(payload: Dictionary) -> void:
 	# Atualiza o HP do jogador local quando ele é o alvo
 	if ttype == "player" and target_id == str(GameState.character.get("id", "")):
 		CharacterData.apply_damage(new_hp, new_mhp)
+
+	# Atualiza a barra de HP do mob alvo
+	if ttype == "mob" and target_id in _mobs:
+		_update_mob_hp_bar(_mobs[target_id], new_hp, new_mhp)
 
 	# Número de dano flutuante sobre o alvo (jogador ou mob)
 	var node = _players.get(target_id, null)
@@ -843,10 +866,32 @@ func _spawn_mob(mob: Dictionary) -> void:
 	lbl.position      = Vector3(0.0, 1.3, 0.0)
 	root.add_child(lbl)
 
+	# Barra de HP (estilo Ragnarok) — fundo escuro + preenchimento que esvazia
+	var hp_bg := Sprite3D.new()
+	hp_bg.texture       = _make_texture(Color(0.0, 0.0, 0.0, 0.65), 50, 6)
+	hp_bg.pixel_size    = HP_W / 50.0
+	hp_bg.billboard     = BaseMaterial3D.BILLBOARD_ENABLED
+	hp_bg.shaded        = false
+	hp_bg.no_depth_test = true
+	hp_bg.position      = Vector3(0.0, HP_Y, 0.0)
+	root.add_child(hp_bg)
+
+	var hp_fill := Sprite3D.new()
+	hp_fill.texture       = _make_texture(Color(1.0, 1.0, 1.0, 1.0), 50, 6)
+	hp_fill.pixel_size    = HP_W / 50.0
+	hp_fill.billboard     = BaseMaterial3D.BILLBOARD_ENABLED
+	hp_fill.shaded        = false
+	hp_fill.no_depth_test = true
+	hp_fill.position      = Vector3(0.0, HP_Y, 0.01)
+	root.add_child(hp_fill)
+	root.set_meta("hp_fill", hp_fill)
+	root.set_meta("hp_w", HP_W)
+
 	root.position = _to_3d(mob.get("x", 0.0), mob.get("y", 0.0))
 	_mob_layer.add_child(root)
 	_mobs[iid] = root
 	_mob_dest[iid] = root.position
+	_update_mob_hp_bar(root, int(mob.get("hp", 1)), int(mob.get("hp_max", 1)))
 
 func _build_drop_node(_drop_id: String, pos: Vector3) -> Node3D:
 	var root := Node3D.new()
