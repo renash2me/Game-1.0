@@ -25,6 +25,7 @@ const ATTACK_INTERVAL : float = 1.0              # segundos entre auto-ataques
 
 # ── Estado ─────────────────────────────────────────────────────────────────────
 var _local_name  : String  = ""
+var _map_display : String  = ""
 var _coords_lbl           = null
 var _cam_ortho   : float   = CAM_ORTHO_DEF
 var _path        : Array[Vector3] = []   # waypoints (centros de célula) até o destino
@@ -50,6 +51,7 @@ var _drops       : Dictionary = {}
 
 func _ready() -> void:
 	_local_name = str(GameState.character.get("name", ""))
+	_map_display = str(GameState.character.get("current_map", "starter_village")).capitalize()
 	CharacterData.apply_from_response(GameState.character)
 
 	# Velocidade de ataque vem das fórmulas (campo derived.aspd)
@@ -138,8 +140,14 @@ func _setup_world() -> void:
 func _anchor_coords_lbl() -> void:
 	if _coords_lbl == null:
 		return
-	var vp_size := get_viewport().get_visible_rect().size
-	_coords_lbl.position = Vector2(8.0, vp_size.y - 24.0)
+	# Topo-direito, alinhado à direita
+	_coords_lbl.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_coords_lbl.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_coords_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_coords_lbl.offset_left   = -320.0
+	_coords_lbl.offset_right  = -10.0
+	_coords_lbl.offset_top    = 8.0
+	_coords_lbl.offset_bottom = 48.0
 
 # ── Conversão de coordenadas ───────────────────────────────────────────────────
 
@@ -241,10 +249,10 @@ func _process(delta: float) -> void:
 
 		if _coords_lbl != null:
 			var sv := _to_server(pp)
-			_coords_lbl.text = "X: %.0f  Y: %.0f" % [sv.x, sv.y]
+			_coords_lbl.text = "%s\nX: %.0f   Y: %.0f" % [_map_display, sv.x, sv.y]
 	else:
 		if _coords_lbl != null:
-			_coords_lbl.text = "X: --  Y: --"
+			_coords_lbl.text = "%s\nX: --   Y: --" % _map_display
 
 	if _dead:
 		_smooth_others(delta)   # morto: sem movimento/ataque, mundo continua
@@ -543,6 +551,34 @@ func _build_menu_ui() -> void:
 	btn_select.pressed.connect(_on_back_to_select)
 	vb.add_child(btn_select)
 
+	# Configurações de log (abre/fecha os toggles)
+	var log_box := VBoxContainer.new()
+	log_box.visible = false
+	var btn_logcfg := Button.new()
+	btn_logcfg.text = "Configurações de log"
+	btn_logcfg.custom_minimum_size = Vector2(260, 38)
+	btn_logcfg.pressed.connect(func(): log_box.visible = not log_box.visible)
+	vb.add_child(btn_logcfg)
+	vb.add_child(log_box)
+
+	var cb_dmg := CheckButton.new()
+	cb_dmg.text = "Log de dano (causado/recebido)"
+	cb_dmg.button_pressed = GameState.log_damage
+	cb_dmg.toggled.connect(func(on): _set_log("damage", on))
+	log_box.add_child(cb_dmg)
+
+	var cb_xp := CheckButton.new()
+	cb_xp.text = "Log de XP (ganho/perdido)"
+	cb_xp.button_pressed = GameState.log_xp
+	cb_xp.toggled.connect(func(on): _set_log("xp", on))
+	log_box.add_child(cb_xp)
+
+	var cb_drop := CheckButton.new()
+	cb_drop.text = "Log de drops pegos"
+	cb_drop.button_pressed = GameState.log_drops
+	cb_drop.toggled.connect(func(on): _set_log("drops", on))
+	log_box.add_child(cb_drop)
+
 	var btn_logout := Button.new()
 	btn_logout.text = "Deslogar"
 	btn_logout.custom_minimum_size = Vector2(260, 38)
@@ -551,6 +587,13 @@ func _build_menu_ui() -> void:
 	vb.add_child(btn_logout)
 
 	_menu_layer.visible = false
+
+func _set_log(key: String, on: bool) -> void:
+	match key:
+		"damage": GameState.log_damage = on
+		"xp":     GameState.log_xp = on
+		"drops":  GameState.log_drops = on
+	GameState.save_log_settings()
 
 func _toggle_menu() -> void:
 	if _menu_layer != null:

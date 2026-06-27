@@ -10,20 +10,32 @@ const CHANNEL_COLORS := {
 	"map":    Color(0.9, 0.9, 0.9),
 	"global": Color(0.6, 1.0, 0.6),
 	"party":  Color(0.5, 0.8, 1.0),
+	"battle": Color(1.0, 0.9, 0.9),
 	"system": Color(1.0, 0.8, 0.3),
 }
+const BATTLE_COLOR := Color(1.0, 0.55, 0.3)
+const XP_COLOR     := Color(0.6, 1.0, 0.6)
+const DROP_COLOR   := Color(1.0, 0.85, 0.3)
+
+const TAB_CHANNELS := ["map", "global", "party", "battle"]
+const SEND_CHANNELS := ["map", "global", "party"]
 
 var _active_channel: String = "map"
+var _tab_lines: Dictionary = {}
 
 func _ready() -> void:
 	_log.bbcode_enabled = true
 	_log.scroll_following = true
 	_log.text = ""
 
-	_chan_tabs.tab_count = 3
+	for ch in TAB_CHANNELS:
+		_tab_lines[ch] = []
+
+	_chan_tabs.tab_count = 4
 	_chan_tabs.set_tab_title(0, "Mapa")
 	_chan_tabs.set_tab_title(1, "Global")
 	_chan_tabs.set_tab_title(2, "Party")
+	_chan_tabs.set_tab_title(3, "Batalha")
 	_chan_tabs.tab_changed.connect(_on_tab_changed)
 
 	_send_btn.pressed.connect(_on_send_pressed)
@@ -31,7 +43,7 @@ func _ready() -> void:
 
 	WsClient.message_received.connect(_on_ws_message)
 
-	_add_system_line("Conectado ao Aethermoor.")
+	_add_to_all("Conectado ao Aethermoor.", CHANNEL_COLORS["system"])
 
 # ── Envio ─────────────────────────────────────────────────────────────────────
 
@@ -40,45 +52,94 @@ func _on_send_pressed() -> void:
 	if msg.is_empty():
 		return
 	_input.text = ""
-
+	var ch := _active_channel if _active_channel in SEND_CHANNELS else "map"
 	WsClient.send({
 		"type": "CHAT",
-		"payload": {"channel": _active_channel, "message": msg}
+		"payload": {"channel": ch, "message": msg}
 	})
 
-# ── Canal ─────────────────────────────────────────────────────────────────────
+# ── Abas ──────────────────────────────────────────────────────────────────────
 
 func _on_tab_changed(tab: int) -> void:
-	match tab:
-		0: _active_channel = "map"
-		1: _active_channel = "global"
-		2: _active_channel = "party"
+	_active_channel = TAB_CHANNELS[tab] if tab < TAB_CHANNELS.size() else "map"
+	_render_active()
 
 # ── Mensagens WS ──────────────────────────────────────────────────────────────
 
 func _on_ws_message(type: String, payload: Dictionary) -> void:
-	if type == "CHAT":
-		var channel : String = payload.get("channel", "map")
-		var sender  : String = payload.get("sender_name", "?")
-		var msg     : String = payload.get("message", "")
-		_add_line(channel, "[%s] %s" % [sender, msg])
-	elif type == "SYSTEM":
-		_add_system_line(payload.get("message", ""))
+	match type:
+		"CHAT":
+			var channel : String = payload.get("channel", "map")
+			if channel == "local":
+				channel = "map"
+			var sender : String = payload.get("sender_name", "?")
+			var msg    : String = payload.get("message", "")
+			_add_to_tab(channel, "[%s] %s" % [sender, msg], CHANNEL_COLORS.get(channel, Color.WHITE))
+		"SYSTEM":
+			_add_to_all("[sistema] " + str(payload.get("message", "")), CHANNEL_COLORS["system"])
+		"DAMAGE":
+			if GameState.log_damage:
+				_log_damage(payload)
+		"XP_GAIN":
+			if GameState.log_xp:
+				_add_to_tab("battle", "+%d XP" % int(payload.get("gained", 0)), XP_COLOR)
+		"PLAYER_DEATH":
+			if GameState.log_xp:
+				_add_to_tab("battle", "-%d XP (você morreu)" % int(payload.get("xp_lost", 0)), XP_COLOR)
+		"DROP_PICKED":
+			if GameState.log_drops and str(payload.get("picker_id", "")) == _my_id():
+				var name_str : String = str(payload.get("item_name", payload.get("item_id", "item")))
+				_add_to_all("Você pegou: %s" % name_str, DROP_COLOR)
 
-func _add_system_line(msg: String) -> void:
-	_add_line("system", "[sistema] " + msg)
+func _log_damage(payload: Dictionary) -> void:
+	var my := _my_id()
+	var dmg  : int  = int(payload.get("damage", 0))
+	var crit : bool = payload.get("is_critical", false)
+	var miss : bool = payload.get("is_miss", false)
+	if str(payload.get("attacker_id", "")) == my:
+		if miss:
+			_add_to_tab("battle", "Você errou o ataque.", BATTLE_COLOR)
+		else:
+			_add_to_tab("battle", "Você causou %d de dano%s" % [dmg, " (CRÍTICO!)" if crit else ""], BATTLE_COLOR)
+	elif str(payload.get("target_id", "")) == my and str(payload.get("target_type", "")) == "player":
+		if miss:
+			_add_to_tab("battle", "Você esquivou.", BATTLE_COLOR)
+		else:
+			_add_to_tab("battle", "Você recebeu %d de dano." % dmg, BATTLE_COLOR)
 
-func _add_line(channel: String, text: String) -> void:
-	var color: Color = CHANNEL_COLORS.get(channel, Color.WHITE)
+func _my_id() -> String:
+	return str(GameState.character.get("id", ""))
+
+# ── Buffers por aba ─────────────────────────────────────────────────────────────
+
+func _fmt(text: String, color: Color) -> String:
 	var hex := "#%02x%02x%02x" % [int(color.r * 255), int(color.g * 255), int(color.b * 255)]
-	_log.append_text("[color=%s]%s[/color]\n" % [hex, text.xml_escape()])
-	_trim_log()
+	return "[color=%s]%s[/color]\n" % [hex, text.xml_escape()]
 
-func _trim_log() -> void:
-	var lines := _log.text.split("\n")
-	if lines.size() > MAX_LINES:
-		_log.clear()
-		_log.text = "\n".join(lines.slice(lines.size() - MAX_LINES))
+func _add_to_tab(ch: String, text: String, color: Color) -> void:
+	if ch not in _tab_lines:
+		ch = "map"
+	var line := _fmt(text, color)
+	var buf : Array = _tab_lines[ch]
+	buf.append(line)
+	if buf.size() > MAX_LINES:
+		buf.remove_at(0)
+	if ch == _active_channel:
+		_log.append_text(line)
+
+func _add_to_all(text: String, color: Color) -> void:
+	var line := _fmt(text, color)
+	for ch in _tab_lines:
+		var buf : Array = _tab_lines[ch]
+		buf.append(line)
+		if buf.size() > MAX_LINES:
+			buf.remove_at(0)
+	_log.append_text(line)
+
+func _render_active() -> void:
+	_log.clear()
+	for line in _tab_lines[_active_channel]:
+		_log.append_text(line)
 
 # ── Focus no Enter ────────────────────────────────────────────────────────────
 

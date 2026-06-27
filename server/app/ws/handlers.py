@@ -475,9 +475,16 @@ async def _handle_pickup(manager: ConnectionManager, character_id: uuid.UUID, pa
         await add_item_to_inventory(character_id, item_id, quantity, session)
         await session.commit()
 
+    from app.data.loader import get_items
+    item_name = get_items().get(item_id, {}).get("name", item_id)
     await broadcast_map(manager, map_id, {
         "type": "DROP_PICKED",
-        "payload": {"drop_id": drop_id, "picker_id": str(character_id)},
+        "payload": {
+            "drop_id": drop_id,
+            "picker_id": str(character_id),
+            "item_id": item_id,
+            "item_name": item_name,
+        },
         "timestamp": _now(),
     })
 
