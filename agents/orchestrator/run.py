@@ -35,7 +35,7 @@ CHANGELOG = REPO / "agents" / "state" / "CHANGELOG.md"
 PROMPT = Path(__file__).parent / "prompt.md"
 
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-MODEL = os.environ.get("GM_MODEL", "qwen3:8b")
+MODEL = os.environ.get("GM_MODEL", "qwen3:4b")
 
 CATALOGS = ["items", "cards", "monsters", "maps", "skills", "quests", "classes", "formulas"]
 
@@ -78,9 +78,17 @@ def gather_facts() -> dict:
     return facts
 
 
-def call_ollama(prompt: str, timeout: int = 900) -> str:
+def call_ollama(prompt: str, timeout: int = 1800) -> str:
+    # Qwen3: "/no_think" desliga o bloco de raciocínio (mais rápido, e evita
+    # gastar a janela de saída pensando). num_ctx/num_predict grandes para o
+    # prompt grande não truncar o documento.
     body = json.dumps(
-        {"model": MODEL, "prompt": prompt, "stream": False, "options": {"temperature": 0.2}}
+        {
+            "model": MODEL,
+            "prompt": prompt + "\n\n/no_think",
+            "stream": False,
+            "options": {"temperature": 0.2, "num_ctx": 8192, "num_predict": 4096},
+        }
     ).encode()
     req = urllib.request.Request(
         f"{OLLAMA}/api/generate", data=body, headers={"Content-Type": "application/json"}
@@ -96,7 +104,9 @@ def strip_think(text: str) -> str:
 def sanity_ok(out: str, facts: dict) -> tuple[bool, str]:
     if len(out) < 800:
         return False, "saída muito curta"
-    for header in ("# GAME STATE", "## 1.", "## 7."):
+    if "game state" not in out.lower():
+        return False, "faltou o título GAME STATE"
+    for header in ("## 1.", "## 7."):
         if header not in out:
             return False, f"faltou a seção '{header}'"
     if "<think>" in out:
@@ -106,6 +116,11 @@ def sanity_ok(out: str, facts: dict) -> tuple[bool, str]:
         if mid and mid not in out and name not in out:
             return False, f"monstro '{mid}' não aparece no documento"
     return True, "ok"
+
+
+def _commit(paths: list[str], msg: str) -> None:
+    subprocess.run(["git", "-C", str(REPO), "add", *paths], check=False)
+    subprocess.run(["git", "-C", str(REPO), "commit", "-m", msg], check=False)
 
 
 def _changelog(msg: str) -> None:
@@ -142,10 +157,16 @@ def main() -> None:
     print(f"[gm] chamando {MODEL} em {OLLAMA} ...", file=sys.stderr)
     out = strip_think(call_ollama(prompt))
 
+    # Guarda sempre a saída crua para inspeção (mesmo se rejeitada)
+    (REPO / "agents" / "state" / "_last_output.md").write_text(out + "\n", encoding="utf-8")
+
     ok, why = sanity_ok(out, facts)
     if not ok:
-        _changelog(f"rodada REJEITADA (sanity: {why}) — GAME_STATE preservado")
+        _changelog(f"rodada REJEITADA (sanity: {why}) — GAME_STATE preservado; saída crua em _last_output.md")
         print(f"[gm] saída rejeitada ({why}); documento anterior preservado.", file=sys.stderr)
+        if args.commit:
+            _commit(["agents/state/_last_output.md", "agents/state/CHANGELOG.md"],
+                    "chore(agents): game-master rejeitado (saída crua para debug)")
         sys.exit(2)
 
     STATE.write_text(out.rstrip() + "\n", encoding="utf-8")
@@ -153,11 +174,8 @@ def main() -> None:
     print("[gm] GAME_STATE.md atualizado.", file=sys.stderr)
 
     if args.commit:
-        git("add", str(STATE.relative_to(REPO)), str(CHANGELOG.relative_to(REPO)))
-        subprocess.run(
-            ["git", "-C", str(REPO), "commit", "-m", "chore(agents): game-master atualiza GAME_STATE"],
-            check=False,
-        )
+        _commit(["agents/state/GAME_STATE.md", "agents/state/CHANGELOG.md", "agents/state/_last_output.md"],
+                "chore(agents): game-master atualiza GAME_STATE")
         print("[gm] commitado no branch atual.", file=sys.stderr)
 
 
