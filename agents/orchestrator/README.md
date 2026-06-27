@@ -27,13 +27,13 @@
 - Sanity check passou; resumo da rodada registrado.
 
 ## Como rodar (`run.py`)
-Sem dependências externas — só Python 3 + Ollama rodando.
+Sem dependências externas — só Python 3 (+ Ollama quando usar o modelo).
 
 ```bash
-# ver os fatos coletados e o prompt, SEM chamar o modelo:
-python3 agents/orchestrator/run.py --dry-run
+# gerar o GAME_STATE.md SEM o modelo (narrativa de fallback) — bom p/ testar:
+python3 agents/orchestrator/run.py --no-llm
 
-# gerar e escrever o GAME_STATE.md (não commita):
+# gerar com o modelo (não commita):
 python3 agents/orchestrator/run.py
 
 # gerar e também commitar no branch agents:
@@ -42,13 +42,14 @@ python3 agents/orchestrator/run.py --commit
 
 Config por variável de ambiente:
 - `OLLAMA_HOST` (default `http://localhost:11434`)
-- `GM_MODEL` (default `qwen3:8b`; use `qwen3:4b` se o 8B ficar lento no 3050)
+- `GM_MODEL` (default `qwen3:4b`)
 
-**Robustez:** os fatos (contagens, monstros, mapas, fórmulas, commits) são
-coletados deterministicamente; o modelo só faz a prosa. A saída só sobrescreve o
-`GAME_STATE.md` se passar num **sanity check** (seções certas, cita todos os
-monstros, sem `<think>` solto). Se falhar, o doc anterior é **preservado** e a
-rejeição vai pro `CHANGELOG.md`.
+**Design (robusto p/ modelo pequeno em 4GB):** a estrutura e os fatos
+(contagens, monstros, mapas, fórmulas, commits) são montados
+**deterministicamente** a partir de `template.md` — sempre corretos. O modelo
+faz **apenas o parágrafo de "mudanças recentes"** (seção 8), tarefa pequena e
+confiável. Se o modelo falhar/voltar vazio, um **fallback** automático assume.
+Resultado: o documento **sempre sai válido**.
 
 **Guardrails:** ver `agents/README.md`. Não altera código nem dados do jogo —
 apenas resume e coordena.
