@@ -77,6 +77,49 @@ async def spawn_map_mobs(map_id: str, spawns: list) -> None:
             await _spawn_mob(map_id, sp["mob_id"], sp.get("area", {}))
 
 
+async def respawn_all_maps() -> int:
+    """Limpa e re-spawna os mobs de todos os mapas conforme a config atual,
+    avisando os clientes (MOB_CLEAR + MOB_SPAWN). Usado pelo admin ao salvar."""
+    from app.ws.broadcaster import broadcast_map
+    from app.ws.manager import manager
+
+    monsters = get_monsters()
+    r = get_redis()
+    total = 0
+    for map_id in get_maps():
+        await _clear_map_mobs(map_id, r)
+        await broadcast_map(manager, map_id, {"type": "MOB_CLEAR", "payload": {}})
+
+        spawns = get_map_spawns(map_id)
+        if not spawns:
+            continue
+        await spawn_map_mobs(map_id, spawns)
+
+        ids = await r.smembers(f"map_mobs:{map_id}")
+        mobs_data = []
+        for iid in ids:
+            mob_raw = await r.hgetall(f"mob:{iid}")
+            if not mob_raw:
+                continue
+            md = monsters.get(mob_raw.get("mob_id", ""), {})
+            mobs_data.append({
+                "instance_id": iid,
+                "mob_id": mob_raw.get("mob_id"),
+                "name": md.get("name", "?"),
+                "ai_type": md.get("ai_type", "passive"),
+                "hp": int(mob_raw.get("hp", 0)),
+                "hp_max": int(mob_raw.get("hp_max", 1)),
+                "x": float(mob_raw.get("x", 0)),
+                "y": float(mob_raw.get("y", 0)),
+            })
+            total += 1
+        if mobs_data:
+            await broadcast_map(manager, map_id, {"type": "MOB_SPAWN", "payload": {"mobs": mobs_data}})
+
+    logger.info("respawn_all_maps", total=total)
+    return total
+
+
 async def _spawn_mob(map_id: str, mob_id: str, area: dict) -> str:
     monsters = get_monsters()
     mob_data = monsters.get(mob_id)
@@ -87,6 +130,13 @@ async def _spawn_mob(map_id: str, mob_id: str, area: dict) -> str:
     instance_id = str(uuid.uuid4())
     x1 = float(area.get("x1", 0.0)); x2 = float(area.get("x2", 0.0))
     y1 = float(area.get("y1", 0.0)); y2 = float(area.get("y2", 0.0))
+    # Área sem tamanho (ex.: 0,0,0,0) empilharia tudo num ponto → espalha num
+    # box padrão de 400x400 ao redor do centro informado.
+    if abs(x2 - x1) < 1.0 and abs(y2 - y1) < 1.0:
+        cx0 = (x1 + x2) / 2.0
+        cy0 = (y1 + y2) / 2.0
+        x1, x2 = cx0 - 200.0, cx0 + 200.0
+        y1, y2 = cy0 - 200.0, cy0 + 200.0
     x = random.uniform(x1, x2)
     y = random.uniform(y1, y2)
     cx = (x1 + x2) / 2

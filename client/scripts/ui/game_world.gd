@@ -193,8 +193,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 			MOUSE_BUTTON_LEFT:
 				if event.pressed:
-					if _inv_ui.visible:
-						return
 					_left_held = true
 					_stand_up()   # agir levanta o personagem
 					var target := _ground_at_mouse()
@@ -221,7 +219,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				if event.pressed:
 					_try_pickup_at(_ground_at_mouse())
 	elif event is InputEventMouseMotion:
-		if _left_held and _drag_to_move and not _inv_ui.visible:
+		if _left_held and _drag_to_move:
 			_set_destination(_ground_at_mouse())
 	elif event.is_action_pressed("inventory"):
 		_inv_ui.visible = !_inv_ui.visible
@@ -407,6 +405,7 @@ func _on_ws_message(type: String, payload: Dictionary) -> void:
 		"PLAYER_JOIN":  _handle_player_join(payload)
 		"PLAYER_LEAVE": _handle_player_leave(payload)
 		"MOB_DEATH":    _handle_mob_death(payload)
+		"MOB_CLEAR":    _handle_mob_clear(payload)
 		"DROP_APPEAR":  _handle_drop_appear(payload)
 		"DROP_PICKED":  _handle_drop_taken(payload)
 		"DROP_TAKEN":   _handle_drop_taken(payload)
@@ -432,6 +431,14 @@ func _handle_map_players(payload: Dictionary) -> void:
 func _handle_mob_spawn(payload: Dictionary) -> void:
 	for mob in payload.get("mobs", []):
 		_spawn_mob(mob)
+
+func _handle_mob_clear(_payload: Dictionary) -> void:
+	# Re-spawn ao vivo (admin): remove todos os mobs antes de receber os novos
+	for iid in _mobs:
+		_mobs[iid].queue_free()
+	_mobs.clear()
+	_mob_dest.clear()
+	_target_mob = ""
 
 func _handle_player_move(payload: Dictionary) -> void:
 	var cid : String = payload.get("character_id", "")

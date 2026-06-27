@@ -59,8 +59,15 @@ def list_catalog(catalog: str, _=Depends(_auth)) -> list[Any]:
 
 # ── Create ────────────────────────────────────────────────────────────────────
 
+async def _maybe_respawn(catalog: str) -> None:
+    """Aplica ao vivo as mudanças que afetam mobs (re-spawna os mapas)."""
+    if catalog in ("monsters", "maps"):
+        from app.systems.mob_spawn import respawn_all_maps
+        await respawn_all_maps()
+
+
 @router.post("/{catalog}", status_code=201)
-def create_entry(catalog: str, body: dict, _=Depends(_auth)) -> dict:
+async def create_entry(catalog: str, body: dict, _=Depends(_auth)) -> dict:
     if catalog not in _FILES:
         raise HTTPException(status_code=404, detail="Catálogo não encontrado")
     if "id" not in body or not body["id"]:
@@ -72,13 +79,14 @@ def create_entry(catalog: str, body: dict, _=Depends(_auth)) -> dict:
 
     data.append(body)
     _write(catalog, data)
+    await _maybe_respawn(catalog)
     return body
 
 
 # ── Update ────────────────────────────────────────────────────────────────────
 
 @router.put("/{catalog}/{entry_id}")
-def update_entry(catalog: str, entry_id: str, body: dict, _=Depends(_auth)) -> dict:
+async def update_entry(catalog: str, entry_id: str, body: dict, _=Depends(_auth)) -> dict:
     if catalog not in _FILES:
         raise HTTPException(status_code=404, detail="Catálogo não encontrado")
 
@@ -90,13 +98,14 @@ def update_entry(catalog: str, entry_id: str, body: dict, _=Depends(_auth)) -> d
     body["id"] = entry_id
     data[idx] = body
     _write(catalog, data)
+    await _maybe_respawn(catalog)
     return body
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────
 
 @router.delete("/{catalog}/{entry_id}", status_code=204)
-def delete_entry(catalog: str, entry_id: str, _=Depends(_auth)) -> None:
+async def delete_entry(catalog: str, entry_id: str, _=Depends(_auth)) -> None:
     if catalog not in _FILES:
         raise HTTPException(status_code=404, detail="Catálogo não encontrado")
 
@@ -106,3 +115,4 @@ def delete_entry(catalog: str, entry_id: str, _=Depends(_auth)) -> None:
         raise HTTPException(status_code=404, detail=f"'{entry_id}' não encontrado")
 
     _write(catalog, new_data)
+    await _maybe_respawn(catalog)

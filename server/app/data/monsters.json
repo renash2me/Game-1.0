@@ -6,27 +6,52 @@
     "hp_max": 50,
     "base_xp": 2,
     "job_xp": 1,
-    "str": 1, "agi": 1, "vit": 0, "int_": 0, "dex": 6, "luk": 30,
+    "str": 1,
+    "agi": 1,
+    "vit": 0,
+    "int_": 0,
+    "dex": 6,
+    "luk": 30,
     "attack_min": 7,
     "attack_max": 10,
     "defense": 0,
-    "move_speed": 55.0,
-    "attack_range": 50.0,
-    "aggro_range": 0.0,
+    "move_speed": 55,
+    "attack_range": 50,
+    "aggro_range": 0,
+    "respawn_seconds": 8,
     "ai_type": "passive",
     "size": "small",
     "element": "water",
     "race": "plant",
-    "respawn_seconds": 8,
-    "tags": [],
-    "spawns": [
-      {"map_id": "starter_village", "count": 3, "area": {"x1": -170.0, "y1": -210.0, "x2": 170.0, "y2": -70.0}}
-    ],
     "drops": [
-      {"item_id": "jellopy",       "chance": 0.7000},
-      {"item_id": "sticky_mucus",  "chance": 0.1500},
-      {"item_id": "zeny_pouch_sm", "chance": 0.3000},
-      {"item_id": "card_poring",   "chance": 0.0001}
+      {
+        "item_id": "jellopy",
+        "chance": 0.7
+      },
+      {
+        "item_id": "sticky_mucus",
+        "chance": 0.15
+      },
+      {
+        "item_id": "zeny_pouch_sm",
+        "chance": 0.3
+      },
+      {
+        "item_id": "card_poring",
+        "chance": 0.0001
+      }
+    ],
+    "spawns": [
+      {
+        "map_id": "starter_village",
+        "count": 20,
+        "area": {
+          "x1": -250,
+          "y1": -250,
+          "x2": 250,
+          "y2": 250
+        }
+      }
     ]
   },
   {
@@ -36,7 +61,12 @@
     "hp_max": 80,
     "base_xp": 4,
     "job_xp": 2,
-    "str": 3, "agi": 3, "vit": 0, "int_": 0, "dex": 10, "luk": 5,
+    "str": 3,
+    "agi": 3,
+    "vit": 0,
+    "int_": 0,
+    "dex": 10,
+    "luk": 5,
     "attack_min": 12,
     "attack_max": 16,
     "defense": 0,
@@ -51,9 +81,18 @@
     "tags": [],
     "spawns": [],
     "drops": [
-      {"item_id": "fluff",      "chance": 0.6000},
-      {"item_id": "chrysalis",  "chance": 0.0500},
-      {"item_id": "card_fabre", "chance": 0.0001}
+      {
+        "item_id": "fluff",
+        "chance": 0.6
+      },
+      {
+        "item_id": "chrysalis",
+        "chance": 0.05
+      },
+      {
+        "item_id": "card_fabre",
+        "chance": 0.0001
+      }
     ]
   }
 ]

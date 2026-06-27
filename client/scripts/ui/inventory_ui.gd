@@ -1,6 +1,7 @@
 extends Control
 
 const TABS : Array = [
+	["Todos",        ["*"]],
 	["Consumíveis",  ["consumable", "zeny_bag"]],
 	["Equipamentos", ["weapon", "armor"]],
 	["Etc",          []],
@@ -81,6 +82,7 @@ func _build_ui() -> void:
 
 	_panel = PanelContainer.new()
 	_panel.custom_minimum_size = Vector2(300, 0)
+	_panel.mouse_filter = Control.MOUSE_FILTER_STOP   # consome cliques (não "vaza" pro mapa)
 	add_child(_panel)
 
 	var vbox := VBoxContainer.new()
@@ -239,6 +241,7 @@ func _render_list() -> void:
 
 	var included_types : Array = TABS[_active_tab][1]
 	var all_tab_types  : Array = ["consumable", "zeny_bag", "weapon", "armor"]
+	var is_all         : bool  = "*" in included_types
 	var is_catch_all   : bool  = included_types.is_empty()
 
 	for item in _all_items:
@@ -249,7 +252,9 @@ func _render_list() -> void:
 		var item_type : String     = item_cat.get("type", "")
 
 		var matches := false
-		if is_catch_all:
+		if is_all:
+			matches = true
+		elif is_catch_all:
 			matches = item_type not in all_tab_types
 		else:
 			matches = item_type in included_types
