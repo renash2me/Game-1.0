@@ -3,7 +3,7 @@
     "id": "poring",
     "name": "Poring",
     "level": 1,
-    "hp_max": 50,
+    "hp_max": 40,
     "base_xp": 2,
     "job_xp": 1,
     "str": 1,
@@ -44,7 +44,7 @@
     "spawns": [
       {
         "map_id": "starter_village",
-        "count": 20,
+        "count": 5,
         "area": {
           "x1": -250,
           "y1": -250,
@@ -92,6 +92,57 @@
       {
         "item_id": "card_fabre",
         "chance": 0.0001
+      }
+    ]
+  },
+  {
+    "id": "lobo_filhote",
+    "name": "Lobo Filhote",
+    "level": 2,
+    "hp_max": 55,
+    "base_xp": 5,
+    "job_xp": 3,
+    "str": 2,
+    "agi": 4,
+    "vit": 1,
+    "int_": 0,
+    "dex": 2,
+    "luk": 4,
+    "attack_min": 5,
+    "attack_max": 9,
+    "defense": 1,
+    "move_speed": 30,
+    "attack_range": 50,
+    "aggro_range": 90,
+    "respawn_seconds": 9,
+    "ai_type": "passive",
+    "size": "small",
+    "element": "neutral",
+    "race": "humanoid",
+    "drops": [
+      {
+        "item_id": "card_lobo_filhote",
+        "chance": 0.001
+      },
+      {
+        "item_id": "red_potion",
+        "chance": 0.25
+      },
+      {
+        "item_id": "knife",
+        "chance": 0.1
+      }
+    ],
+    "spawns": [
+      {
+        "map_id": "starter_village",
+        "count": 2,
+        "area": {
+          "x1": -100,
+          "y1": -100,
+          "x2": 100,
+          "y2": 100
+        }
       }
     ]
   }
