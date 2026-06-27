@@ -26,5 +26,29 @@
 - `GAME_STATE.md` reflete a `master` atual, com seção de "pendências/provisórios".
 - Sanity check passou; resumo da rodada registrado.
 
+## Como rodar (`run.py`)
+Sem dependências externas — só Python 3 + Ollama rodando.
+
+```bash
+# ver os fatos coletados e o prompt, SEM chamar o modelo:
+python3 agents/orchestrator/run.py --dry-run
+
+# gerar e escrever o GAME_STATE.md (não commita):
+python3 agents/orchestrator/run.py
+
+# gerar e também commitar no branch agents:
+python3 agents/orchestrator/run.py --commit
+```
+
+Config por variável de ambiente:
+- `OLLAMA_HOST` (default `http://localhost:11434`)
+- `GM_MODEL` (default `qwen3:8b`; use `qwen3:4b` se o 8B ficar lento no 3050)
+
+**Robustez:** os fatos (contagens, monstros, mapas, fórmulas, commits) são
+coletados deterministicamente; o modelo só faz a prosa. A saída só sobrescreve o
+`GAME_STATE.md` se passar num **sanity check** (seções certas, cita todos os
+monstros, sem `<think>` solto). Se falhar, o doc anterior é **preservado** e a
+rejeição vai pro `CHANGELOG.md`.
+
 **Guardrails:** ver `agents/README.md`. Não altera código nem dados do jogo —
 apenas resume e coordena.
