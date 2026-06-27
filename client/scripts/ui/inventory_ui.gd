@@ -159,6 +159,12 @@ func _build_ui() -> void:
 	_detail_err.text = ""
 	_detail_box.add_child(_detail_err)
 
+	var drop_btn := Button.new()
+	drop_btn.text = "Largar 1 no chão"
+	drop_btn.modulate = Color(1.0, 0.8, 0.6)
+	drop_btn.pressed.connect(_on_drop_item)
+	_detail_box.add_child(drop_btn)
+
 	var close_detail := Button.new()
 	close_detail.text = "Fechar detalhe"
 	close_detail.pressed.connect(_hide_detail)
@@ -376,6 +382,17 @@ func _hide_detail() -> void:
 	_selected_item = {}
 	_detail_box.visible = false
 	_detail_err.text = ""
+
+# ── Largar item no chão ───────────────────────────────────────────────────────
+
+func _on_drop_item() -> void:
+	var inv_id : String = str(_selected_item.get("id", ""))
+	if inv_id == "":
+		return
+	WsClient.send({"type": "DROP_ITEM", "payload": {"inventory_item_id": inv_id, "quantity": 1}})
+	_hide_detail()
+	await get_tree().create_timer(0.3).timeout   # aguarda o servidor remover do inventário
+	_load_inventory()
 
 # ── Equipar (duplo clique) ────────────────────────────────────────────────────
 

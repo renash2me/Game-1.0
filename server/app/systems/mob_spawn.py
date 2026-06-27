@@ -1,6 +1,7 @@
 import asyncio
 import json
 import random
+import time
 import uuid
 
 import structlog
@@ -10,7 +11,8 @@ from app.redis_client import get_redis
 
 logger = structlog.get_logger()
 
-DROP_EXPIRE_SECONDS = 300  # drops somem após 5 min
+DROP_EXPIRE_SECONDS = 15  # drops somem do chão após 15s
+DROP_OWNER_SECONDS = 10   # preferência do dono dura 10s; depois qualquer um pega
 
 # Mantém referência forte às tasks de IA. Sem isso o event loop só guarda
 # referência fraca e o coletor de lixo pode encerrar os loops silenciosamente.
@@ -145,17 +147,21 @@ async def save_drops_to_redis(
     x: float,
     y: float,
     mob_id: str,
+    owner_id: str = "",
 ) -> list[dict]:
     if not drops:
         return []
 
     r = get_redis()
+    owner_until = int(time.time() * 1000) + DROP_OWNER_SECONDS * 1000 if owner_id else 0
     drop_dicts = []
     pipe = r.pipeline()
 
     for drop in drops:
         d = drop.to_dict(x, y)
         d["mob_id"] = mob_id
+        d["owner_id"] = owner_id
+        d["owner_until"] = owner_until
         drop_dicts.append(d)
         pipe.hset(f"drop:{d['drop_id']}", mapping={
             k: json.dumps(v) if isinstance(v, (list, dict)) else str(v)
@@ -165,4 +171,28 @@ async def save_drops_to_redis(
         pipe.sadd(f"map_drops:{map_id}", d["drop_id"])
 
     await pipe.execute()
+    for d in drop_dicts:
+        d["ttl"] = DROP_EXPIRE_SECONDS   # vida cheia para o cliente
     return drop_dicts
+
+
+async def place_ground_drop(
+    map_id: str, item_id: str, quantity: int, x: float, y: float, owner_id: str = "",
+) -> dict:
+    """Cria um drop avulso no chão (ex.: item largado por um jogador). Retorna o payload."""
+    r = get_redis()
+    owner_until = int(time.time() * 1000) + DROP_OWNER_SECONDS * 1000 if owner_id else 0
+    drop_id = str(uuid.uuid4())
+    d = {
+        "drop_id": drop_id, "item_id": item_id, "quantity": quantity,
+        "x": x, "y": y, "cards": [], "owner_id": owner_id, "owner_until": owner_until,
+    }
+    pipe = r.pipeline()
+    pipe.hset(f"drop:{drop_id}", mapping={
+        k: json.dumps(v) if isinstance(v, (list, dict)) else str(v) for k, v in d.items()
+    })
+    pipe.expire(f"drop:{drop_id}", DROP_EXPIRE_SECONDS)
+    pipe.sadd(f"map_drops:{map_id}", drop_id)
+    await pipe.execute()
+    d["ttl"] = DROP_EXPIRE_SECONDS
+    return d

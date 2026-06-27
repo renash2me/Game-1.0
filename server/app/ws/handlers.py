@@ -142,6 +142,8 @@ async def send_map_state(manager: ConnectionManager, character_id: uuid.UUID) ->
         draw = await r.hgetall(f"drop:{did}")
         if not draw:
             continue
+        ttl_ms = await r.pttl(f"drop:{did}")
+        ttl = ttl_ms / 1000.0 if ttl_ms and ttl_ms > 0 else 15.0
         await send_to(manager, character_id, {
             "type": "DROP_APPEAR",
             "payload": {
@@ -150,6 +152,9 @@ async def send_map_state(manager: ConnectionManager, character_id: uuid.UUID) ->
                 "quantity": int(draw.get("quantity", "1")),
                 "x": float(draw.get("x", 0)),
                 "y": float(draw.get("y", 0)),
+                "owner_id": draw.get("owner_id", ""),
+                "owner_until": int(draw.get("owner_until", "0") or "0"),
+                "ttl": ttl,
             },
             "timestamp": _now(),
         })
@@ -173,6 +178,8 @@ async def dispatch(manager: ConnectionManager, character_id: uuid.UUID, raw: str
             await _handle_attack(manager, character_id, payload)
         case "PICKUP":
             await _handle_pickup(manager, character_id, payload)
+        case "DROP_ITEM":
+            await _handle_drop_item(manager, character_id, payload)
         case "CHAT":
             await _handle_chat(manager, character_id, payload)
         case "SIT":
@@ -264,6 +271,11 @@ async def _handle_attack(manager: ConnectionManager, character_id: uuid.UUID, pa
     mob_stats = stats_from_mob(mob_data)
     damage, is_miss, is_crit = physical_attack(char_stats, mob_stats)
 
+    # Rastreia o dano por jogador (o dono do drop = quem causou mais dano)
+    if damage > 0:
+        await r.hincrby(f"mob_dmg:{instance_id}", str(character_id), damage)
+        await r.expire(f"mob_dmg:{instance_id}", 120)
+
     mob_hp = int(mob_raw["hp"])
     mob_hp_max = int(mob_raw["hp_max"])
     new_hp = max(0, mob_hp - damage)
@@ -316,9 +328,16 @@ async def _handle_mob_death(
     await r.srem(f"map_mobs:{map_id}", instance_id)
     await r.delete(f"mob:{instance_id}")
 
+    # Dono do drop = jogador que causou mais dano (preferência por 10s)
+    dmg_map = await r.hgetall(f"mob_dmg:{instance_id}")
+    owner_id = str(killer_id)
+    if dmg_map:
+        owner_id = max(dmg_map.items(), key=lambda kv: int(kv[1]))[0]
+    await r.delete(f"mob_dmg:{instance_id}")
+
     # Drops — caem na última posição do mob (mob_x/mob_y vêm do chamador)
     drops = roll_drops(mob_data)
-    drop_dicts = await save_drops_to_redis(map_id, drops, mob_x, mob_y, mob_id)
+    drop_dicts = await save_drops_to_redis(map_id, drops, mob_x, mob_y, mob_id, owner_id)
 
     await broadcast_map(manager, map_id, {
         "type": "MOB_DEATH",
@@ -433,6 +452,17 @@ async def _handle_pickup(manager: ConnectionManager, character_id: uuid.UUID, pa
     if not map_id:
         return
 
+    # Preferência do dono: nos primeiros 10s, só o dono pega
+    owner_id = drop_raw.get("owner_id", "")
+    owner_until = int(drop_raw.get("owner_until", "0") or "0")
+    if owner_id and _now() < owner_until and str(character_id) != owner_id:
+        await send_to(manager, character_id, {
+            "type": "SYSTEM",
+            "payload": {"message": "Esse item ainda pertence a outro jogador."},
+            "timestamp": _now(),
+        })
+        return
+
     item_id = drop_raw.get("item_id", "")
     quantity = int(drop_raw.get("quantity", "1"))
 
@@ -452,6 +482,53 @@ async def _handle_pickup(manager: ConnectionManager, character_id: uuid.UUID, pa
     })
 
     logger.debug("drop_picked", drop_id=drop_id, character_id=str(character_id), item=item_id)
+
+
+async def _handle_drop_item(manager: ConnectionManager, character_id: uuid.UUID, payload: dict) -> None:
+    """Jogador larga um item do inventário no chão (sem dono — qualquer um pega)."""
+    from app.redis_client import get_redis
+    from app.database import async_session_factory
+    from app.models.inventory import InventoryItem
+    from app.systems.mob_spawn import place_ground_drop
+    from sqlalchemy import select
+
+    inv_id = str(payload.get("inventory_item_id", ""))
+    qty = int(payload.get("quantity", 1))
+    if not inv_id or qty < 1:
+        return
+
+    r = get_redis()
+    map_id = manager.get_map(character_id)
+    if not map_id:
+        return
+
+    item_id = ""
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(InventoryItem).where(
+                InventoryItem.id == uuid.UUID(inv_id),
+                InventoryItem.character_id == character_id,
+                InventoryItem.is_equipped == False,
+            )
+        )
+        inv_item = result.scalar_one_or_none()
+        if not inv_item or inv_item.quantity < qty:
+            return
+        item_id = inv_item.item_id
+        inv_item.quantity -= qty
+        if inv_item.quantity <= 0:
+            await session.delete(inv_item)
+        await session.commit()
+
+    pos = await r.hgetall(f"pos:{character_id}")
+    x = float(pos.get("x", 0)); y = float(pos.get("y", 0))
+    d = await place_ground_drop(map_id, item_id, qty, x, y, owner_id="")
+    await broadcast_map(manager, map_id, {
+        "type": "DROP_APPEAR",
+        "payload": d,
+        "timestamp": _now(),
+    })
+    logger.debug("item_dropped", character_id=str(character_id), item=item_id, qty=qty)
 
 
 # ── SIT ──────────────────────────────────────────────────────────────────────

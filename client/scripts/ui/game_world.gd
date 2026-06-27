@@ -461,6 +461,14 @@ func _spawn_drop(drop: Dictionary) -> void:
 	var node := _build_drop_node(drop_id, pos)
 	_drop_layer.add_child(node)
 	_drops[drop_id] = node
+	# Some sozinho ao expirar (ttl em segundos vindo do servidor)
+	var ttl : float = drop.get("ttl", 15.0)
+	get_tree().create_timer(ttl).timeout.connect(_expire_drop.bind(drop_id))
+
+func _expire_drop(drop_id: String) -> void:
+	if drop_id in _drops:
+		_drops[drop_id].queue_free()
+		_drops.erase(drop_id)
 
 func _handle_drop_taken(payload: Dictionary) -> void:
 	var drop_id : String = payload.get("drop_id", "")
