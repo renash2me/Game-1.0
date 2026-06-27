@@ -6,11 +6,11 @@ extends Control
 ## ativas + Limpar). Botão esquerdo ou o atalho dispara o slot.
 ## Persistência: user://hotbar_<char_id>.cfg (local, por personagem).
 
-const BARS := 4
-const SLOTS := 12
-const PHYS_KEYS := [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9, KEY_0, KEY_MINUS, KEY_EQUAL]
-const KEY_LABELS := ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="]
-const MOD_PREFIX := ["", "⇧", "⌃", "⌥"]   # barra 0..3
+const BARS = 4
+const SLOTS = 12
+const PHYS_KEYS = [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9, KEY_0, KEY_MINUS, KEY_EQUAL]
+const KEY_LABELS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="]
+const MOD_PREFIX = ["", "Sh+", "Ct+", "Al+"]   # barra 0..3
 
 var _char_id    : String     = ""
 var _cfg_path   : String     = ""
@@ -19,6 +19,7 @@ var _visible_bars : int      = 4
 var _slot_btns  : Array      = []    # [bar][slot] -> Button
 var _bar_rows   : Array      = []    # bar -> HBoxContainer
 var _bar_btn    : Button     = null
+var _root_vb    : VBoxContainer = null
 
 var _item_catalog : Dictionary = {}  # item_id -> data (só consumíveis)
 var _skills       : Array      = []  # skills ativas do personagem
@@ -33,8 +34,16 @@ func _ready() -> void:
 	_load_config()
 	_refresh_all_slots()
 	_refresh_visible()
+	get_viewport().size_changed.connect(_reposition)
+	call_deferred("_reposition")
 	ApiClient.get_req("/api/items", _on_items_loaded)
 	ApiClient.get_req("/api/characters/%s/skills" % _char_id, _on_skills_loaded)
+
+func _reposition() -> void:
+	if _root_vb == null:
+		return
+	var vp := get_viewport_rect().size
+	_root_vb.position = Vector2((vp.x - _root_vb.size.x) * 0.5, vp.y - _root_vb.size.y - 8.0)
 
 # ── UI ──────────────────────────────────────────────────────────────────────
 
@@ -42,15 +51,12 @@ func _build_ui() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	var vb := VBoxContainer.new()
-	vb.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	vb.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	vb.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	vb.offset_bottom = -6.0
-	vb.alignment = BoxContainer.ALIGNMENT_CENTER
-	vb.add_theme_constant_override("separation", 2)
-	vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(vb)
+	_root_vb = VBoxContainer.new()
+	_root_vb.alignment = BoxContainer.ALIGNMENT_CENTER
+	_root_vb.add_theme_constant_override("separation", 2)
+	_root_vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_root_vb)
+	var vb := _root_vb
 
 	var top := HBoxContainer.new()
 	top.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -102,6 +108,7 @@ func _refresh_visible() -> void:
 	for b in range(BARS):
 		_bar_rows[b].visible = b < _visible_bars
 	_bar_btn.text = "Barras: %d" % _visible_bars
+	call_deferred("_reposition")
 
 func _refresh_all_slots() -> void:
 	for b in range(BARS):

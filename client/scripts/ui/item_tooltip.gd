@@ -1,8 +1,11 @@
 extends Control
 
-# Popup de detalhes de item (botão direito no inventário).
+# Popup flutuante de detalhes de item (botão direito no inventário).
 # Arrastável, fechável com X ou clicando fora.
 
+signal drop_requested(item: Dictionary)
+
+var _item        : Dictionary = {}
 var _panel       : PanelContainer
 var _title_lbl   : Label
 var _icon_panel  : PanelContainer
@@ -18,6 +21,7 @@ func _ready() -> void:
 # ── API pública ────────────────────────────────────────────────────────────────
 
 func show_item(item: Dictionary, cat: Dictionary, screen_pos: Vector2) -> void:
+	_item = item
 	var name_str : String = cat.get("name", item.get("item_id", "?"))
 	var refine   : int    = item.get("refinement", 0)
 	_title_lbl.text = name_str + (" +%d" % refine if refine > 0 else "")
@@ -105,6 +109,16 @@ func _build_ui() -> void:
 	_desc_lbl.modulate = Color(0.75, 0.85, 0.75)
 	_desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(_desc_lbl)
+
+	var drop_btn := Button.new()
+	drop_btn.text = "Largar 1 no chão"
+	drop_btn.modulate = Color(1.0, 0.8, 0.6)
+	drop_btn.pressed.connect(_on_drop_pressed)
+	vbox.add_child(drop_btn)
+
+func _on_drop_pressed() -> void:
+	drop_requested.emit(_item)
+	visible = false
 
 # ── Posicionamento ─────────────────────────────────────────────────────────────
 

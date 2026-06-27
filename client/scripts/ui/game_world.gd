@@ -78,7 +78,6 @@ func _ready() -> void:
 
 	_build_death_ui()
 	_build_menu_ui()
-	_hud.add_child(load("res://scripts/ui/hotbar.gd").new())   # barra de ação
 
 	WsClient.message_received.connect(_on_ws_message)
 	WsClient.ws_disconnected.connect(_on_ws_disconnected)
@@ -87,6 +86,8 @@ func _ready() -> void:
 	# chega antes desta cena carregar e se perde — sem isto, mobs só aparecem
 	# quando algo os reenvia, ex.: respawn pelo admin).
 	WsClient.send({"type": "REQUEST_MAP_STATE", "payload": {}})
+
+	_hud.add_child(load("res://scripts/ui/hotbar.gd").new())   # barra de ação (por último)
 
 func _setup_camera() -> void:
 	_camera.projection = Camera3D.PROJECTION_ORTHOGONAL

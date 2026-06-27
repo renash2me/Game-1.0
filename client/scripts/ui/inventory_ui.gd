@@ -320,17 +320,26 @@ func _on_row_gui_input(event: InputEvent, item: Dictionary, cat: Dictionary) -> 
 		MOUSE_BUTTON_LEFT:
 			if event.double_click:
 				_do_use_or_equip(item, cat)
-			# clique simples no esquerdo NÃO abre detalhe (atrapalhava o duplo-clique)
+			# clique simples no esquerdo não faz nada (não atrapalha o duplo-clique)
 		MOUSE_BUTTON_RIGHT:
-			_select_item(item, cat)   # detalhe (com Largar) = botão direito
+			_show_item_tooltip(item, cat)   # detalhe = janela FLUTUANTE (não dentro do inventário)
 
 func _show_item_tooltip(item: Dictionary, cat: Dictionary) -> void:
 	if _tooltip == null or not is_instance_valid(_tooltip):
 		_tooltip = load("res://scripts/ui/item_tooltip.gd").new()
 		_tooltip.visible = false
 		add_child(_tooltip)
+		_tooltip.drop_requested.connect(_on_tooltip_drop)
 	var mouse := get_local_mouse_position()
 	_tooltip.show_item(item, cat, mouse + Vector2(16, 16))
+
+func _on_tooltip_drop(item: Dictionary) -> void:
+	var inv_id : String = str(item.get("id", ""))
+	if inv_id == "":
+		return
+	WsClient.send({"type": "DROP_ITEM", "payload": {"inventory_item_id": inv_id, "quantity": 1}})
+	await get_tree().create_timer(0.3).timeout
+	_load_inventory()
 
 # ── Detalhe ───────────────────────────────────────────────────────────────────
 
