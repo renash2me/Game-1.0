@@ -64,8 +64,13 @@ func _on_inv_loaded(code: int, data) -> void:
 	_hide_detail()
 	_render_list()
 
-func _on_ws_message(type: String, _payload: Dictionary) -> void:
-	if type in ["DROP_TAKEN", "LEVEL_UP"] and visible:
+func _on_ws_message(type: String, payload: Dictionary) -> void:
+	if not visible:
+		return
+	# Atualiza o inventário ao pegar um item (DROP_PICKED) ou subir de nível
+	if type == "DROP_PICKED" and str(payload.get("picker_id", "")) == _char_id:
+		_load_inventory()
+	elif type == "LEVEL_UP":
 		_load_inventory()
 
 # ── Construção da UI ──────────────────────────────────────────────────────────

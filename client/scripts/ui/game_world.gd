@@ -198,12 +198,16 @@ func _unhandled_input(event: InputEvent) -> void:
 					_left_held = true
 					_stand_up()   # agir levanta o personagem
 					var target := _ground_at_mouse()
-					# Estilo Ragnarok: clicar num monstro ataca; no chão, anda.
-					var mob_id := _mob_at(target)
-					if mob_id != "":
+					# Prioridade: pegar drop > atacar mob > andar
+					var drop_id := _drop_at(target)
+					if drop_id != "":
+						_drag_to_move = false
+						_target_mob   = ""
+						WsClient.send({"type": "PICKUP", "payload": {"drop_id": drop_id}})
+					elif _mob_at(target) != "":
 						# Trava o alvo: persegue e ataca sozinho até matar ou clicar fora
 						_drag_to_move = false
-						_target_mob   = mob_id
+						_target_mob   = _mob_at(target)
 						_attack_cd    = 0.0
 						_path.clear()
 					else:
@@ -366,6 +370,18 @@ func _mob_at(ground_pos: Vector3) -> String:
 
 func _attack_mob(mob_id: String) -> void:
 	WsClient.send({"type": "ATTACK", "payload": {"target_id": mob_id, "attack_type": "melee"}})
+
+func _drop_at(ground_pos: Vector3) -> String:
+	var best_id   := ""
+	var best_dist := 0.8   # raio de clique sobre o drop (~32 server units)
+	for drop_id in _drops:
+		var dn = _drops[drop_id]
+		var d : float = Vector2(dn.position.x - ground_pos.x,
+		                        dn.position.z - ground_pos.z).length()
+		if d < best_dist:
+			best_dist = d
+			best_id   = drop_id
+	return best_id
 
 func _try_pickup_at(ground_pos: Vector3) -> void:
 	var best_id   := ""

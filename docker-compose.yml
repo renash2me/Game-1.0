@@ -51,6 +51,9 @@ services:
     container_name: aethermoor_server
     restart: unless-stopped
     env_file: /home/claude-monitor/mmorpg/.env
+    volumes:
+      # Persiste os dados editáveis no admin (não voltam ao baked da imagem no restart)
+      - /home/claude-monitor/mmorpg/server/app/data:/app/app/data
     depends_on:
       postgres-game:
         condition: service_healthy

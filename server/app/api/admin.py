@@ -39,6 +39,15 @@ def _write(catalog: str, data: list) -> None:
     loader.load_all()
 
 
+# ── Reload manual ─────────────────────────────────────────────────────────────
+# Definido ANTES de /{catalog} senão o FastAPI casa "reload" como um catálogo.
+
+@router.post("/reload", status_code=200)
+def reload_catalogs(_=Depends(_auth)) -> dict:
+    loader.load_all()
+    return {"ok": True}
+
+
 # ── List ──────────────────────────────────────────────────────────────────────
 
 @router.get("/{catalog}")
@@ -97,11 +106,3 @@ def delete_entry(catalog: str, entry_id: str, _=Depends(_auth)) -> None:
         raise HTTPException(status_code=404, detail=f"'{entry_id}' não encontrado")
 
     _write(catalog, new_data)
-
-
-# ── Reload manual ─────────────────────────────────────────────────────────────
-
-@router.post("/reload", status_code=200)
-def reload_catalogs(_=Depends(_auth)) -> dict:
-    loader.load_all()
-    return {"ok": True}
