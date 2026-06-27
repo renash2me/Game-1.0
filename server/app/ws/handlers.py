@@ -95,25 +95,32 @@ async def send_map_state(manager: ConnectionManager, character_id: uuid.UUID) ->
         "y": char_raw.get("pos_y", "0.0"),
     })
 
-    # MAP_PLAYERS — outros jogadores no mapa
+    # Reenvia jogadores/mobs/drops (extraído p/ reuso no REQUEST_MAP_STATE)
+    await send_map_entities(manager, character_id, map_id, r)
+
+
+async def send_map_entities(manager: ConnectionManager, character_id: uuid.UUID, map_id: str, r) -> None:
+    """Envia MAP_PLAYERS + MOB_SPAWN + DROP_APPEAR do mapa ao personagem.
+    Chamado no login (send_map_state) e quando o cliente fica pronto e pede o
+    estado (REQUEST_MAP_STATE) — corrige o race em que o MOB_SPAWN do login
+    chegava antes de o game_world estar escutando."""
+    from app.data.loader import get_monsters
+
     members = manager.get_map_members(map_id) - {character_id}
     players_data = []
     for cid in members:
         pos = await r.hgetall(f"pos:{cid}")
         if pos:
             players_data.append({"character_id": str(cid), "x": float(pos["x"]), "y": float(pos["y"])})
-
     await send_to(manager, character_id, {
         "type": "MAP_PLAYERS",
         "payload": {"players": players_data},
         "timestamp": _now(),
     })
 
-    # MOB_SPAWN — mobs ativos no mapa
     monsters = get_monsters()
-    instance_ids = await r.smembers(f"map_mobs:{map_id}")
     mobs_data = []
-    for iid in instance_ids:
+    for iid in await r.smembers(f"map_mobs:{map_id}"):
         mob_raw = await r.hgetall(f"mob:{iid}")
         if not mob_raw:
             continue
@@ -128,7 +135,6 @@ async def send_map_state(manager: ConnectionManager, character_id: uuid.UUID) ->
             "x": float(mob_raw.get("x", 0)),
             "y": float(mob_raw.get("y", 0)),
         })
-
     if mobs_data:
         await send_to(manager, character_id, {
             "type": "MOB_SPAWN",
@@ -136,9 +142,7 @@ async def send_map_state(manager: ConnectionManager, character_id: uuid.UUID) ->
             "timestamp": _now(),
         })
 
-    # DROP_APPEAR — drops já no chão (para quem entra/volta ao mapa)
-    drop_ids = await r.smembers(f"map_drops:{map_id}")
-    for did in drop_ids:
+    for did in await r.smembers(f"map_drops:{map_id}"):
         draw = await r.hgetall(f"drop:{did}")
         if not draw:
             continue
@@ -180,6 +184,10 @@ async def dispatch(manager: ConnectionManager, character_id: uuid.UUID, raw: str
             await _handle_pickup(manager, character_id, payload)
         case "DROP_ITEM":
             await _handle_drop_item(manager, character_id, payload)
+        case "USE_ITEM":
+            await _handle_use_item(manager, character_id, payload)
+        case "REQUEST_MAP_STATE":
+            await _handle_request_map_state(manager, character_id)
         case "CHAT":
             await _handle_chat(manager, character_id, payload)
         case "SIT":
@@ -536,6 +544,79 @@ async def _handle_drop_item(manager: ConnectionManager, character_id: uuid.UUID,
         "timestamp": _now(),
     })
     logger.debug("item_dropped", character_id=str(character_id), item=item_id, qty=qty)
+
+
+# ── REQUEST_MAP_STATE ─────────────────────────────────────────────────────────
+
+async def _handle_request_map_state(manager: ConnectionManager, character_id: uuid.UUID) -> None:
+    """Cliente ficou pronto e pediu o estado do mapa (corrige o race do login)."""
+    from app.redis_client import get_redis
+    r = get_redis()
+    map_id = manager.get_map(character_id) or "starter_village"
+    await send_map_entities(manager, character_id, map_id, r)
+
+
+# ── USE_ITEM ──────────────────────────────────────────────────────────────────
+
+async def _handle_use_item(manager: ConnectionManager, character_id: uuid.UUID, payload: dict) -> None:
+    """Usa um consumível: aplica o efeito (HP/SP) na vida ativa (Redis) + DB,
+    consome 1 unidade e atualiza o HUD do jogador."""
+    from app.redis_client import get_redis
+    from app.database import async_session_factory
+    from app.models.inventory import InventoryItem
+    from app.data.loader import get_items
+    from sqlalchemy import select
+
+    inv_id = str(payload.get("inventory_item_id", ""))
+    if not inv_id:
+        return
+
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(InventoryItem).where(
+                InventoryItem.id == uuid.UUID(inv_id),
+                InventoryItem.character_id == character_id,
+                InventoryItem.is_equipped == False,
+            )
+        )
+        inv_item = result.scalar_one_or_none()
+        if not inv_item or inv_item.quantity < 1:
+            return
+        item_id = inv_item.item_id
+        item_data = get_items().get(item_id, {})
+        if item_data.get("type") != "consumable":
+            await send_to(manager, character_id, {
+                "type": "SYSTEM",
+                "payload": {"message": "Esse item não é um consumível."},
+                "timestamp": _now(),
+            })
+            return
+        inv_item.quantity -= 1
+        if inv_item.quantity <= 0:
+            await session.delete(inv_item)
+        await session.commit()
+
+    effect = item_data.get("effect", {})
+    hp_restore = int(effect.get("hp_restore", 0))
+    sp_restore = int(effect.get("sp_restore", 0))
+
+    r = get_redis()
+    c = await r.hgetall(f"char_stats:{character_id}")
+    if not c:
+        return
+    hp_max = int(c.get("hp_max", 1))
+    sp_max = int(c.get("sp_max", 1))
+    new_hp = min(hp_max, int(c.get("hp", 0)) + hp_restore)
+    new_sp = min(sp_max, int(c.get("sp", 0)) + sp_restore)
+    await r.hset(f"char_stats:{character_id}", mapping={"hp": str(new_hp), "sp": str(new_sp)})
+    await _persist_char_to_db(character_id, {"hp": str(new_hp), "sp": str(new_sp)})
+
+    await send_to(manager, character_id, {
+        "type": "STATS_UPDATE",
+        "payload": {"hp": new_hp, "hp_max": hp_max, "sp": new_sp, "sp_max": sp_max},
+        "timestamp": _now(),
+    })
+    logger.debug("item_used", character_id=str(character_id), item=item_id, hp=hp_restore, sp=sp_restore)
 
 
 # ── SIT ──────────────────────────────────────────────────────────────────────

@@ -82,6 +82,10 @@ func _ready() -> void:
 	WsClient.message_received.connect(_on_ws_message)
 	WsClient.ws_disconnected.connect(_on_ws_disconnected)
 	MapManager.load_map(GameState.character.get("current_map", "starter_village"))
+	# Pede o estado do mapa agora que já estamos escutando (o MOB_SPAWN do login
+	# chega antes desta cena carregar e se perde — sem isto, mobs só aparecem
+	# quando algo os reenvia, ex.: respawn pelo admin).
+	WsClient.send({"type": "REQUEST_MAP_STATE", "payload": {}})
 
 func _setup_camera() -> void:
 	_camera.projection = Camera3D.PROJECTION_ORTHOGONAL

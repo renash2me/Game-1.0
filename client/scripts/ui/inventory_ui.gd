@@ -33,6 +33,7 @@ func _ready() -> void:
 	_build_ui()
 	call_deferred("_default_position")
 	WsClient.message_received.connect(_on_ws_message)
+	visibility_changed.connect(_on_visibility_changed)   # sem isto, abrir não carregava nada
 
 func _on_visibility_changed() -> void:
 	if visible:
@@ -318,7 +319,7 @@ func _on_row_gui_input(event: InputEvent, item: Dictionary, cat: Dictionary) -> 
 	match event.button_index:
 		MOUSE_BUTTON_LEFT:
 			if event.double_click:
-				_do_equip_item(item, cat)
+				_do_use_or_equip(item, cat)
 			else:
 				_select_item(item, cat)
 		MOUSE_BUTTON_RIGHT:
@@ -404,7 +405,21 @@ func _on_drop_item() -> void:
 	await get_tree().create_timer(0.3).timeout   # aguarda o servidor remover do inventário
 	_load_inventory()
 
-# ── Equipar (duplo clique) ────────────────────────────────────────────────────
+# ── Duplo clique: usar (consumível) ou equipar (equipamento) ──────────────────
+
+func _do_use_or_equip(item: Dictionary, cat: Dictionary) -> void:
+	if cat.get("equip_slot", "") != "":
+		_do_equip_item(item, cat)
+	elif cat.get("type", "") == "consumable":
+		_do_use_item(item)
+
+func _do_use_item(item: Dictionary) -> void:
+	var inv_id : String = str(item.get("id", ""))
+	if inv_id == "":
+		return
+	WsClient.send({"type": "USE_ITEM", "payload": {"inventory_item_id": inv_id}})
+	await get_tree().create_timer(0.3).timeout   # aguarda o servidor consumir
+	_load_inventory()
 
 func _do_equip_item(item: Dictionary, cat: Dictionary) -> void:
 	if cat.get("equip_slot", "") == "":
