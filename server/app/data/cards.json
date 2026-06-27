@@ -18,7 +18,7 @@
     "drop_chance": 0.0001
   },
   {
-    "id": "card_lobo-filhote",
+    "id": "card_lobo_filhote",
     "name": "Card Lobo Filhote",
     "effect": {
       "str": 1

@@ -121,12 +121,16 @@
     "race": "humanoid",
     "drops": [
       {
-        "item_id": "card_lobo-filhote",
+        "item_id": "card_lobo_filhote",
         "chance": 0.001
       },
       {
         "item_id": "red_potion",
         "chance": 0.25
+      },
+      {
+        "item_id": "knife",
+        "chance": 0.1
       }
     ],
     "spawns": [
