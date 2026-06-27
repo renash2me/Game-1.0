@@ -86,18 +86,18 @@ Contagens: items: 18 · cards: 3 · monsters: 3 · maps: 2 · skills: 2 · quest
 - Migrations **sempre** via Alembic (nunca `create_all()` nem SQL manual).
 
 ## 8. Mudanças recentes (resumo do game-master)
-Resumo automático dos commits recentes: refactor(data): padroniza IDs com underscore (card_lobo-filhote -> card_lobo_filhote); feat(data): novo monstro Lobo Filhote + carta Card Lobo Filhote (criados no admin); fix: mobs sumidos (Ã¡rea 0,0,0,0), inventÃ¡rio nÃ£o mostrava itens e travava o andar; fix: pegar drop com clique esquerdo, persistir dados do admin, refresh do inventÃ¡rio; feat: coords no topo-direito + mapa, aba de batalha no chat e toggles de log; feat: drops com dono (mais dano, 10s), expiraÃ§Ã£o 15s e sistema de largar item.
+Resumo automático dos commits recentes: refactor(data): padroniza IDs com underscore (card_lobo-filhote -> card_lobo_filhote); feat(data): novo monstro Lobo Filhote + carta Card Lobo Filhote (criados no admin); fix: mobs sumidos (área 0,0,0,0), inventário não mostrava itens e travava o andar; fix: pegar drop com clique esquerdo, persistir dados do admin, refresh do inventário; feat: coords no topo-direito + mapa, aba de batalha no chat e toggles de log; feat: drops com dono (mais dano, 10s), expiração 15s e sistema de largar item.
 
 Commits recentes:
 - ca89163 refactor(data): padroniza IDs com underscore (card_lobo-filhote -> card_lobo_filhote)
 - 4ae47f6 feat(data): novo monstro Lobo Filhote + carta Card Lobo Filhote (criados no admin)
-- f5a02c3 fix: mobs sumidos (Ã¡rea 0,0,0,0), inventÃ¡rio nÃ£o mostrava itens e travava o andar
-- b2ddb55 fix: pegar drop com clique esquerdo, persistir dados do admin, refresh do inventÃ¡rio
+- f5a02c3 fix: mobs sumidos (área 0,0,0,0), inventário não mostrava itens e travava o andar
+- b2ddb55 fix: pegar drop com clique esquerdo, persistir dados do admin, refresh do inventário
 - a514067 feat: coords no topo-direito + mapa, aba de batalha no chat e toggles de log
-- 1874f96 feat: drops com dono (mais dano, 10s), expiraÃ§Ã£o 15s e sistema de largar item
-- 8d2914c fix: drops nÃ£o apareciam (cliente ignorava os drops do MOB_DEATH)
+- 1874f96 feat: drops com dono (mais dano, 10s), expiração 15s e sistema de largar item
+- 8d2914c fix: drops não apareciam (cliente ignorava os drops do MOB_DEATH)
 - aac69e3 feat: CD de respawn por monstro no admin + fix seletor de mapas + Enter no login
 - a9cc389 fix: mob perde o alvo quando o jogador morre + limpa mobs antigos no boot
-- ce7e99c fix: HP nÃ£o subia ao alocar VIT (cache Redis defasado + floor no level baixo)
+- ce7e99c fix: HP não subia ao alocar VIT (cache Redis defasado + floor no level baixo)
 - 6b40c7c fix: restaura HP/SP 100% ao subir de level + corrige flag 'dead' presa
-- 65689c9 feat: menu Esc (voltar/deslogar), seleÃ§Ã£o de personagem por slot e exclusÃ£o
+- 65689c9 feat: menu Esc (voltar/deslogar), seleção de personagem por slot e exclusão
