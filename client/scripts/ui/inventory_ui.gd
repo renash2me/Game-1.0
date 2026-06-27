@@ -320,10 +320,9 @@ func _on_row_gui_input(event: InputEvent, item: Dictionary, cat: Dictionary) -> 
 		MOUSE_BUTTON_LEFT:
 			if event.double_click:
 				_do_use_or_equip(item, cat)
-			else:
-				_select_item(item, cat)
+			# clique simples no esquerdo NÃO abre detalhe (atrapalhava o duplo-clique)
 		MOUSE_BUTTON_RIGHT:
-			_show_item_tooltip(item, cat)
+			_select_item(item, cat)   # detalhe (com Largar) = botão direito
 
 func _show_item_tooltip(item: Dictionary, cat: Dictionary) -> void:
 	if _tooltip == null or not is_instance_valid(_tooltip):
