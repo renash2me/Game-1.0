@@ -42,7 +42,8 @@ CATALOGS = ["items", "cards", "monsters", "maps", "skills", "quests", "classes",
 
 def git(*args: str) -> str:
     return subprocess.run(
-        ["git", "-C", str(REPO), *args], capture_output=True, text=True
+        ["git", "-C", str(REPO), *args],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
     ).stdout.strip()
 
 
@@ -80,7 +81,8 @@ def call_ollama(prompt: str, timeout: int = 600) -> str:
             "model": MODEL,
             "prompt": prompt,
             "stream": False,
-            "options": {"temperature": 0.3, "num_ctx": 4096, "num_predict": 512},
+            "think": False,  # desliga o raciocínio do Qwen3 (senão ele gasta o orçamento pensando)
+            "options": {"temperature": 0.3, "num_ctx": 4096, "num_predict": 1024},
         }
     ).encode()
     req = urllib.request.Request(
