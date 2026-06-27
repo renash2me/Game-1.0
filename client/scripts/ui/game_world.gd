@@ -78,6 +78,7 @@ func _ready() -> void:
 
 	_build_death_ui()
 	_build_menu_ui()
+	_hud.add_child(load("res://scripts/ui/hotbar.gd").new())   # barra de ação
 
 	WsClient.message_received.connect(_on_ws_message)
 	WsClient.ws_disconnected.connect(_on_ws_disconnected)

@@ -186,6 +186,8 @@ async def dispatch(manager: ConnectionManager, character_id: uuid.UUID, raw: str
             await _handle_drop_item(manager, character_id, payload)
         case "USE_ITEM":
             await _handle_use_item(manager, character_id, payload)
+        case "CAST_SKILL":
+            await _handle_cast_skill(manager, character_id, payload)
         case "REQUEST_MAP_STATE":
             await _handle_request_map_state(manager, character_id)
         case "CHAT":
@@ -568,18 +570,24 @@ async def _handle_use_item(manager: ConnectionManager, character_id: uuid.UUID, 
     from sqlalchemy import select
 
     inv_id = str(payload.get("inventory_item_id", ""))
-    if not inv_id:
+    item_id_req = str(payload.get("item_id", ""))  # alternativa: usar qualquer unidade desse item (hotbar)
+    if not inv_id and not item_id_req:
         return
 
     async with async_session_factory() as session:
-        result = await session.execute(
-            select(InventoryItem).where(
+        if inv_id:
+            stmt = select(InventoryItem).where(
                 InventoryItem.id == uuid.UUID(inv_id),
                 InventoryItem.character_id == character_id,
                 InventoryItem.is_equipped == False,
             )
-        )
-        inv_item = result.scalar_one_or_none()
+        else:
+            stmt = select(InventoryItem).where(
+                InventoryItem.item_id == item_id_req,
+                InventoryItem.character_id == character_id,
+                InventoryItem.is_equipped == False,
+            ).limit(1)
+        inv_item = (await session.execute(stmt)).scalar_one_or_none()
         if not inv_item or inv_item.quantity < 1:
             return
         item_id = inv_item.item_id
@@ -617,6 +625,68 @@ async def _handle_use_item(manager: ConnectionManager, character_id: uuid.UUID, 
         "timestamp": _now(),
     })
     logger.debug("item_used", character_id=str(character_id), item=item_id, hp=hp_restore, sp=sp_restore)
+
+
+# ── CAST_SKILL ────────────────────────────────────────────────────────────────
+
+async def _handle_cast_skill(manager: ConnectionManager, character_id: uuid.UUID, payload: dict) -> None:
+    """Conjura uma skill ativa. Valida custo de SP e cooldown; aplica o efeito
+    (por enquanto: hp_restore, ex.: Primeiros Socorros) e atualiza o HUD."""
+    from app.redis_client import get_redis
+    from app.data.loader import get_skills
+
+    skill_id = str(payload.get("skill_id", ""))
+    if not skill_id:
+        return
+    skill = get_skills().get(skill_id)
+    if not skill or skill.get("type") != "active":
+        await send_to(manager, character_id, {
+            "type": "SYSTEM",
+            "payload": {"message": "Skill inválida ou passiva."},
+            "timestamp": _now(),
+        })
+        return
+
+    r = get_redis()
+    cd_key = f"skill_cd:{character_id}:{skill_id}"
+    if await r.exists(cd_key):
+        await send_to(manager, character_id, {
+            "type": "SYSTEM", "payload": {"message": f"{skill['name']} em recarga."}, "timestamp": _now(),
+        })
+        return
+
+    c = await r.hgetall(f"char_stats:{character_id}")
+    if not c or int(c.get("hp", 0)) <= 0:
+        return
+    sp = int(c.get("sp", 0))
+    sp_cost = int(skill.get("sp_cost", 0))
+    if sp < sp_cost:
+        await send_to(manager, character_id, {
+            "type": "SYSTEM", "payload": {"message": "SP insuficiente."}, "timestamp": _now(),
+        })
+        return
+
+    eff = (skill.get("effects") or [{}])[0]
+    hp_restore = int(eff.get("hp_restore", 0))
+    sp_restore = int(eff.get("sp_restore", 0))
+    hp_max = int(c.get("hp_max", 1))
+    sp_max = int(c.get("sp_max", 1))
+    new_hp = min(hp_max, int(c.get("hp", 0)) + hp_restore)
+    new_sp = max(0, min(sp_max, sp - sp_cost + sp_restore))
+
+    await r.hset(f"char_stats:{character_id}", mapping={"hp": str(new_hp), "sp": str(new_sp)})
+    await _persist_char_to_db(character_id, {"hp": str(new_hp), "sp": str(new_sp)})
+
+    cd_ms = int(skill.get("cooldown", 0))
+    if cd_ms > 0:
+        await r.set(cd_key, "1", px=cd_ms)
+
+    await send_to(manager, character_id, {
+        "type": "STATS_UPDATE",
+        "payload": {"hp": new_hp, "hp_max": hp_max, "sp": new_sp, "sp_max": sp_max},
+        "timestamp": _now(),
+    })
+    logger.debug("skill_cast", character_id=str(character_id), skill=skill_id)
 
 
 # ── SIT ──────────────────────────────────────────────────────────────────────
